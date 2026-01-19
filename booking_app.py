@@ -109,8 +109,9 @@ try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
+        # ADDED "RE" to the headers here
         ws_return.append_row([
-            "FILE #", "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy",
+            "FILE #", "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy", "RE",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
         ])
 
@@ -259,7 +260,7 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- FINAL MAPPING ---
+                    # --- FINAL MAPPING (INCLUDES 'RE' DATA) ---
                     save_data = [
                         # 0. FILE #
                         user.get("FILE #") or user.get("FILE", ""), 
@@ -278,7 +279,10 @@ with col1:
                         user.get("WEIGHT") or user.get("Weight", ""),
                         user.get("ALLERGY") or user.get("Allergy", ""),
                         
-                        # 5. New Booking
+                        # 5. RE Data (ADDED HERE)
+                        user.get("RE", ""),
+                        
+                        # 6. New Booking
                         str(r_date),
                         r_time_str,
                         r_treat,
