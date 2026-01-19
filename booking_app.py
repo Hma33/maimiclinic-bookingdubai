@@ -101,15 +101,14 @@ try:
             "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
         ])
 
-    # 2. Existing DB (Read Only Source)
+    # 2. Existing DB (Read Only)
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # 3. Return Patient Booking Sheet (Append Target)
+    # 3. Return Patient Booking Sheet
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
-        # Headers with RE included
         ws_return.append_row([
             "FILE #", "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy", "RE",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
@@ -170,7 +169,7 @@ with col1:
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
                 
                 try:
-                    # Save to SINGLE sheet: New_Users_Booking (Append Only)
+                    # Save to SINGLE sheet: New_Users_Booking
                     ws_new_booking.append_row([
                         full_name, 
                         phone, 
@@ -228,10 +227,8 @@ with col1:
         else:
             # --- DISPLAY INFO ---
             user = st.session_state['user_data']
-            
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
             
-            # HIDDEN FROM UI
             st.success(f"Welcome Back, **{p_name}**!")
             
             if st.button("Change User"):
@@ -260,31 +257,17 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- FINAL MAPPING (INCLUDES 'RE' DATA) ---
                     re_data = user.get("RE") or user.get("Re") or user.get("re", "")
                     
                     save_data = [
-                        # 0. FILE #
                         user.get("FILE #") or user.get("FILE", ""), 
-
-                        # 1. Patient Name
                         user.get("PATIENT NAME") or user.get("Patient Name", ""),
-                        
-                        # 2. Contact Number
                         user.get("Contact number") or user.get("Contact Number", ""),
-                        
-                        # 3. Data of Birth
                         user.get("DATE OF BIRTH", ""),
-                        
-                        # 4. Stats
                         user.get("HEIGHT") or user.get("Height", ""),
                         user.get("WEIGHT") or user.get("Weight", ""),
                         user.get("ALLERGY") or user.get("Allergy", ""),
-                        
-                        # 5. RE Data
                         re_data,
-                        
-                        # 6. New Booking
                         str(r_date),
                         r_time_str,
                         r_treat,
@@ -292,7 +275,6 @@ with col1:
                         "Confirmed (Returning)"
                     ]
                     
-                    # STRICTLY APPEND ROW (NO DELETION)
                     ws_return.append_row(save_data)
                     st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
@@ -300,8 +282,15 @@ with col1:
 
 # === RIGHT COLUMN: INFO PANEL ===
 with col2:
-    st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
-    st.markdown("## Miami Dental Clinic")
+    # ---------------------------------------------------------
+    # 1. LOGO SECTION (NO TOOTH EMOJI)
+    # ---------------------------------------------------------
+    # Upload 'logo.png' to your folder and uncomment next line:
+    # st.image("logo.png", width=150)
+    
+    # Text Header Fallback
+    st.markdown("## Miami Dental Clinic") 
+
     st.markdown("---")
     st.markdown("""
     **Muraqqabat road, REQA bldg. 1st floor,**
@@ -311,14 +300,23 @@ with col2:
     Al Rigga Metro is the nearest metro station (Exit 2).
     """)
     st.write("")
+    
+    # ---------------------------------------------------------
+    # 2. OPERATING HOURS (NO CLOCK EMOJI)
+    # ---------------------------------------------------------
     st.markdown("""
-    ### 🕒 Operating Hours
+    ### Operating Hours
     
     **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
     **Tuesday:** 12:00 PM – 10:00 PM
     **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
     """)
     st.markdown("---")
-    st.markdown("📍 **[View on Google Map](https://maps.google.com)**")
+    
+    # ---------------------------------------------------------
+    # 3. UPDATED MAP LINK (EXACT URL)
+    # ---------------------------------------------------------
+    st.markdown("📍 **[View on Google Map](maps.app.goo.gl/ehSWvb1f4zYEanbs8?g_st=com.google.maps.preview.copy)**")
+    
     st.write("")
     st.info("ℹ️ **System Status:** Online | Data is saving to Google Sheets.")
