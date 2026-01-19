@@ -100,7 +100,7 @@ try:
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
         ws_return.append_row([
-            "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy",
+            "FILE #", "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
         ])
 
@@ -167,7 +167,7 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (STRICT DOB FIX) ---
+    # --- TAB 2: RETURN PATIENT (WITH FILE #) ---
     with tab2:
         st.markdown("#### Verify Identity")
         
@@ -184,17 +184,16 @@ with col1:
                          st.warning("Please enter a valid number.")
                     else:
                         for record in all_records:
-                            # --- HELPER: Clean Dictionary Keys ---
-                            # This handles cases where header is "Contact number " (with space)
+                            # Clean keys
                             clean_record = {k.strip(): v for k, v in record.items()}
                             
-                            # Search for Phone
+                            # Search Phone
                             sheet_phone_raw = str(clean_record.get("Contact number", "") or clean_record.get("Contact Number", ""))
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
                             if clean_input in sheet_phone_clean or sheet_phone_clean in clean_input:
                                 if sheet_phone_clean != "": 
-                                    found_user = clean_record # Use the cleaned-key record
+                                    found_user = clean_record
                                     break
                         
                         if found_user:
@@ -211,23 +210,14 @@ with col1:
             # --- DISPLAY INFO ---
             user = st.session_state['user_data']
             
-            # 1. FETCH NAME
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
+            p_dob = user.get("DATE OF BIRTH") or user.get("Data of Birth", "N/A")
             
-            # 2. FETCH DOB (EXACT MATCH REQUESTED)
-            # We explicitly look for "DATE OF BIRTH"
-            p_dob = user.get("DATE OF BIRTH", "")
-            if not p_dob:
-                # If empty, try fallback just in case
-                p_dob = user.get("Data of Birth", "N/A")
+            # --- SHOW FILE NUMBER IN UI ---
+            p_file = user.get("FILE #") or user.get("FILE", "N/A")
             
             st.success(f"Welcome Back, **{p_name}**!")
-            
-            # Show the user exactly what we found for DOB
-            if p_dob and p_dob != "N/A":
-                st.info(f"📅 **Date of Birth:** {p_dob}")
-            else:
-                st.warning("⚠️ System could not find 'DATE OF BIRTH' in your record.")
+            st.info(f"📂 **File #:** {p_file} | 📅 **DOB:** {p_dob}")
             
             if st.button("Change User"):
                 st.session_state['verified'] = False
@@ -255,15 +245,18 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- FINAL CORRECT MAPPING ---
+                    # --- FINAL CORRECT MAPPING WITH FILE # ---
                     save_data = [
+                        # 0. FILE # (EXACTLY AS REQUESTED)
+                        user.get("FILE #") or user.get("FILE", ""), 
+
                         # 1. Patient Name
                         user.get("PATIENT NAME") or user.get("Patient Name", ""),
                         
                         # 2. Contact Number
                         user.get("Contact number") or user.get("Contact Number", ""),
                         
-                        # 3. Data of Birth (EXACT KEY FROM EXISTING_DB)
+                        # 3. Data of Birth (EXACT KEY)
                         user.get("DATE OF BIRTH", ""),
                         
                         # 4. Stats
