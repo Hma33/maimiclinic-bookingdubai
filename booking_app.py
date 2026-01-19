@@ -124,7 +124,8 @@ col1, col2 = st.columns([2, 1], gap="large")
 
 # === LEFT COLUMN: FORMS ===
 with col1:
-    st.title("Dental Clinic Appointment and Treatment Form")
+    # 👇 UPDATED TITLE HERE
+    st.title("Miami Dental Clinic Appointment and Treatment Form")
     
     tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
