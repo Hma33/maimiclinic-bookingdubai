@@ -167,7 +167,7 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (WITH FILE #) ---
+    # --- TAB 2: RETURN PATIENT (WITH HIDDEN INFO) ---
     with tab2:
         st.markdown("#### Verify Identity")
         
@@ -211,13 +211,11 @@ with col1:
             user = st.session_state['user_data']
             
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
-            p_dob = user.get("DATE OF BIRTH") or user.get("Data of Birth", "N/A")
             
-            # --- SHOW FILE NUMBER IN UI ---
-            p_file = user.get("FILE #") or user.get("FILE", "N/A")
+            # HIDDEN FROM UI, BUT AVAILABLE FOR SAVING
+            # We don't show p_file or p_dob here anymore.
             
             st.success(f"Welcome Back, **{p_name}**!")
-            st.info(f"📂 **File #:** {p_file} | 📅 **DOB:** {p_dob}")
             
             if st.button("Change User"):
                 st.session_state['verified'] = False
