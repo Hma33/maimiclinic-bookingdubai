@@ -143,7 +143,7 @@ with col1:
     
     # --- TAB 1: NEW PATIENT ---
     with tab1:
-        # REMOVED st.form HERE so date updates happen instantly
+        # NO st.form used here to allow dynamic date updates
         st.markdown("#### 1. Full Name")
         c1, c2 = st.columns(2)
         with c1:
@@ -157,10 +157,10 @@ with col1:
         st.markdown("#### 3. Preferred Appointment")
         d_col, t_col = st.columns(2)
         with d_col:
-            # When this changes, the app re-runs immediately
+            # Re-runs app when changed
             date = st.date_input("Preferred Date", min_value=datetime.date.today())
         with t_col:
-            # Logic runs with NEW date and updates list
+            # Dynamic time slots
             valid_slots = get_valid_time_slots(date)
             time_str = st.selectbox("Available Time Slots", valid_slots)
 
@@ -179,18 +179,28 @@ with col1:
                 selected_treatments.append(treat)
         
         st.write("")
-        # Standard button (not form_submit_button)
-        if st.button("Book now", type="primary"): 
+        if st.button("Book now", type="primary"):
             if first_name and last_name and phone:
                 full_name = f"{first_name} {last_name}"
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
                 timestamp = str(datetime.datetime.now())
                 
                 try:
-                    # Save to New Users Sheet
+                    # 1. Save to New Users Sheet
+                    # Columns: Name, Phone, Date, Time, Treatment, Timestamp
                     ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
-                    # Save to Final Bookings Sheet
-                    ws_final.append_row([full_name, phone, str(date), time_str, treatments_str, "Dr. Pending", "Confirmed"])
+                    
+                    # 2. Save to Final Bookings Sheet
+                    # Columns: Name, Phone, Date, Time, Treatment, Doctor Status, Confirmation Status
+                    ws_final.append_row([
+                        full_name, 
+                        phone, 
+                        str(date), 
+                        time_str, 
+                        treatments_str, 
+                        "this patient needs to assign doctor",  # <--- CHANGED HERE
+                        "Confirmed"
+                    ])
                     
                     st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
                 except Exception as e:
@@ -232,13 +242,12 @@ with col1:
                 st.session_state['verified'] = False
                 st.rerun()
 
-            # REMOVED st.form HERE too for dynamic updates
             st.markdown("#### New Appointment Details")
             rd_col, rt_col = st.columns(2)
             with rd_col:
                 r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
             with rt_col:
-                # Dynamic logic
+                # Dynamic Logic
                 r_valid_slots = get_valid_time_slots(r_date)
                 r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
             
@@ -252,7 +261,7 @@ with col1:
                         str(r_date),
                         r_time_str,
                         r_treat,
-                        "Dr. Auto-Assigned",
+                        "this patient needs to assign doctor", # <--- CHANGED HERE
                         "Confirmed (Returning)"
                     ])
                     st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
