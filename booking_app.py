@@ -94,7 +94,7 @@ try:
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
         ws_return.append_row([
-            "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy",
+            "Patient Name", "Contact number", "Data of Birth", "Height", "Weight", "Allergy",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
         ])
 
@@ -161,7 +161,7 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (SMART MATCHING FIX) ---
+    # --- TAB 2: RETURN PATIENT (UPDATED COLUMN NAME) ---
     with tab2:
         st.markdown("#### Verify Identity")
         
@@ -174,29 +174,28 @@ with col1:
             
             if st.button("Find My Record"):
                 try:
-                    # 1. READ ALL DATA AS A DICTIONARY (Handles headers automatically)
+                    # 1. READ ALL DATA AS A DICTIONARY
                     all_records = ws_exist.get_all_records()
                     
                     found_user = None
-                    
-                    # 2. CLEAN THE INPUT (Remove spaces, dashes, +)
-                    # Example: "+971-50 123" becomes "97150123"
                     clean_input = ''.join(filter(str.isdigit, str(phone_input)))
                     
                     if not clean_input:
                          st.warning("Please enter a valid number.")
                     else:
-                        # 3. LOOP AND MATCH WITH CLEANING
                         for record in all_records:
-                            # We check keys carefully. 
-                            # Convert sheet value to string, then clean it
-                            sheet_phone_raw = str(record.get("Contact Number", ""))
+                            # --- CRITICAL UPDATE: Searching for 'Contact number' ---
+                            # We use .get("Contact number") exactly as you requested
+                            sheet_phone_raw = str(record.get("Contact number", ""))
+                            
+                            # Fallback: if 'Contact number' is empty, try 'Contact Number' just in case
+                            if not sheet_phone_raw:
+                                sheet_phone_raw = str(record.get("Contact Number", ""))
+                            
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
-                            # CHECK: Does the sheet number CONTAIN the input, or vice versa?
-                            # This helps if one is "050123456" and the other is "97150123456"
                             if clean_input in sheet_phone_clean or sheet_phone_clean in clean_input:
-                                if sheet_phone_clean != "": # Avoid matching empty cells
+                                if sheet_phone_clean != "": 
                                     found_user = record
                                     break
                         
@@ -206,10 +205,10 @@ with col1:
                             st.rerun()
                         else:
                             st.error(f"❌ Number '{phone_input}' not found.")
-                            # DEBUG HELPER: Show user what headers the app sees
-                            with st.expander("Troubleshoot: See what data is being read"):
-                                st.write("The app is looking for a column named **'Contact Number'**.")
-                                st.write("First 3 records found in DB:", all_records[:3])
+                            with st.expander("Troubleshoot: Check your Headers"):
+                                st.write("The app is looking for a column named **'Contact number'**.")
+                                if all_records:
+                                    st.write("Headers found in your sheet:", list(all_records[0].keys()))
 
                 except Exception as e:
                     st.error(f"Error reading database: {e}")
@@ -250,10 +249,10 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # COPY DATA
+                    # COPY DATA USING "Contact number"
                     ws_return.append_row([
                         user.get("Patient Name", ""),
-                        user.get("Contact Number", ""),
+                        user.get("Contact number", user.get("Contact Number", "")), # Try both casings
                         user.get("Data of Birth", ""),
                         user.get("Height", ""),
                         user.get("Weight", ""),
