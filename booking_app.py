@@ -1,7 +1,6 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account 
-import Credentials
+from google.oauth2.service_account import Credentials
 import datetime
 
 # --- 1. PAGE CONFIGURATION ---
@@ -81,10 +80,10 @@ def get_valid_time_slots(selected_date):
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     if "gcp_service_account" not in st.secrets:
-        st.error("Missing 'gcp_service_account' in secrets.")
+        st.error("Missing 'gcp_service_account' in secrets.toml")
         st.stop()
     creds_dict = dict(st.secrets["gcp_service_account"])
-    if "\\n" in creds_dict["private_key"]:
+    if "private_key" in creds_dict and "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
