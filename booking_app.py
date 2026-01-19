@@ -1,6 +1,7 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
+from google.oauth2.service_account 
+import Credentials
 import datetime
 
 # --- 1. PAGE CONFIGURATION ---
@@ -78,35 +79,21 @@ def get_valid_time_slots(selected_date):
 # --- 5. GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def get_sheet_connection():
-    # Define the scope
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
-    # Check if secrets exist
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     if "gcp_service_account" not in st.secrets:
-        st.error("Missing 'gcp_service_account' in secrets.toml")
+        st.error("Missing 'gcp_service_account' in secrets.")
         st.stop()
-        
-    # Convert secrets to a standard dict
     creds_dict = dict(st.secrets["gcp_service_account"])
-    
-    # Fix the private key format (replace literal \n with actual newlines)
-    if "private_key" in creds_dict:
+    if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-
-    # Create credentials
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
-    
-    # Open the sheet
     return client.open("Clinic_Booking_System")
 
 try:
     SHEET = get_sheet_connection()
     
-    # 1. New Registration Sheet
+    # 1. New Registration Sheet (Consolidated)
     try:
         ws_new_booking = SHEET.worksheet("New_Users_Booking")
     except:
@@ -115,14 +102,15 @@ try:
             "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
         ])
 
-    # 2. Existing DB
+    # 2. Existing DB (Read Only Source)
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # 3. Return Patient Booking Sheet
+    # 3. Return Patient Booking Sheet (Append Target)
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
+        # Headers with RE included
         ws_return.append_row([
             "FILE #", "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy", "RE",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
@@ -183,6 +171,7 @@ with col1:
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
                 
                 try:
+                    # Save to SINGLE sheet: New_Users_Booking (Append Only)
                     ws_new_booking.append_row([
                         full_name, 
                         phone, 
@@ -222,9 +211,10 @@ with col1:
                             sheet_phone_raw = str(clean_record.get("Contact number", "") or clean_record.get("Contact Number", ""))
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
-                            if clean_input in sheet_phone_clean and sheet_phone_clean != "":
-                                found_user = clean_record
-                                break
+                            if clean_input in sheet_phone_clean or sheet_phone_clean in clean_input:
+                                if sheet_phone_clean != "": 
+                                    found_user = clean_record
+                                    break
                         
                         if found_user:
                             st.session_state['verified'] = True
@@ -237,8 +227,12 @@ with col1:
                     st.error(f"Error reading database: {e}")
         
         else:
+            # --- DISPLAY INFO ---
             user = st.session_state['user_data']
+            
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
+            
+            # HIDDEN FROM UI
             st.success(f"Welcome Back, **{p_name}**!")
             
             if st.button("Change User"):
@@ -267,22 +261,39 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
+                    # --- FINAL MAPPING (INCLUDES 'RE' DATA) ---
                     re_data = user.get("RE") or user.get("Re") or user.get("re", "")
+                    
                     save_data = [
+                        # 0. FILE #
                         user.get("FILE #") or user.get("FILE", ""), 
+
+                        # 1. Patient Name
                         user.get("PATIENT NAME") or user.get("Patient Name", ""),
+                        
+                        # 2. Contact Number
                         user.get("Contact number") or user.get("Contact Number", ""),
+                        
+                        # 3. Data of Birth
                         user.get("DATE OF BIRTH", ""),
+                        
+                        # 4. Stats
                         user.get("HEIGHT") or user.get("Height", ""),
                         user.get("WEIGHT") or user.get("Weight", ""),
                         user.get("ALLERGY") or user.get("Allergy", ""),
+                        
+                        # 5. RE Data
                         re_data,
+                        
+                        # 6. New Booking
                         str(r_date),
                         r_time_str,
                         r_treat,
                         "this patient needs to assign doctor",
                         "Confirmed (Returning)"
                     ]
+                    
+                    # STRICTLY APPEND ROW (NO DELETION)
                     ws_return.append_row(save_data)
                     st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
@@ -303,6 +314,7 @@ with col2:
     st.write("")
     st.markdown("""
     ### 🕒 Operating Hours
+    
     **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
     **Tuesday:** 12:00 PM – 10:00 PM
     **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
