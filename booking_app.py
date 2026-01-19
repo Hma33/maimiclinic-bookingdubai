@@ -300,7 +300,7 @@ with col1:
 
 # === RIGHT COLUMN: INFO PANEL ===
 with col2:
-    st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
+    # 🦷 Tooth icon removed here
     st.markdown("## Miami Dental Clinic")
     st.markdown("---")
     st.markdown("""
@@ -312,7 +312,7 @@ with col2:
     """)
     st.write("")
     st.markdown("""
-    ### 🕒 Operating Hours
+    ### Operating Hours
     
     **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
     **Tuesday:** 12:00 PM – 10:00 PM
