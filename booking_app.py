@@ -167,7 +167,7 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (FIXED COLUMN MAPPING) ---
+    # --- TAB 2: RETURN PATIENT (STRICT DOB FIX) ---
     with tab2:
         st.markdown("#### Verify Identity")
         
@@ -184,13 +184,17 @@ with col1:
                          st.warning("Please enter a valid number.")
                     else:
                         for record in all_records:
-                            # Search for 'Contact number'
-                            sheet_phone_raw = str(record.get("Contact number", "") or record.get("Contact Number", ""))
+                            # --- HELPER: Clean Dictionary Keys ---
+                            # This handles cases where header is "Contact number " (with space)
+                            clean_record = {k.strip(): v for k, v in record.items()}
+                            
+                            # Search for Phone
+                            sheet_phone_raw = str(clean_record.get("Contact number", "") or clean_record.get("Contact Number", ""))
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
                             if clean_input in sheet_phone_clean or sheet_phone_clean in clean_input:
                                 if sheet_phone_clean != "": 
-                                    found_user = record
+                                    found_user = clean_record # Use the cleaned-key record
                                     break
                         
                         if found_user:
@@ -207,13 +211,23 @@ with col1:
             # --- DISPLAY INFO ---
             user = st.session_state['user_data']
             
-            # Smart Fetch using exact header names
+            # 1. FETCH NAME
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
-            # Fetch DOB specifically from "DATE OF BIRTH"
-            p_dob = user.get("DATE OF BIRTH") or user.get("Data of Birth") or "N/A"
+            
+            # 2. FETCH DOB (EXACT MATCH REQUESTED)
+            # We explicitly look for "DATE OF BIRTH"
+            p_dob = user.get("DATE OF BIRTH", "")
+            if not p_dob:
+                # If empty, try fallback just in case
+                p_dob = user.get("Data of Birth", "N/A")
             
             st.success(f"Welcome Back, **{p_name}**!")
-            st.info(f"📅 **Date of Birth:** {p_dob}")
+            
+            # Show the user exactly what we found for DOB
+            if p_dob and p_dob != "N/A":
+                st.info(f"📅 **Date of Birth:** {p_dob}")
+            else:
+                st.warning("⚠️ System could not find 'DATE OF BIRTH' in your record.")
             
             if st.button("Change User"):
                 st.session_state['verified'] = False
@@ -241,9 +255,7 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- FIXED MAPPING (REMOVED 'FILE') ---
-                    # This ensures Col 1 = Name, Col 2 = Phone, Col 3 = DOB
-                    
+                    # --- FINAL CORRECT MAPPING ---
                     save_data = [
                         # 1. Patient Name
                         user.get("PATIENT NAME") or user.get("Patient Name", ""),
@@ -251,8 +263,8 @@ with col1:
                         # 2. Contact Number
                         user.get("Contact number") or user.get("Contact Number", ""),
                         
-                        # 3. Data of Birth (Looking for 'DATE OF BIRTH')
-                        user.get("DATE OF BIRTH") or user.get("Data of Birth", ""),
+                        # 3. Data of Birth (EXACT KEY FROM EXISTING_DB)
+                        user.get("DATE OF BIRTH", ""),
                         
                         # 4. Stats
                         user.get("HEIGHT") or user.get("Height", ""),
