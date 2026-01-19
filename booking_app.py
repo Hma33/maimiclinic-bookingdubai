@@ -288,15 +288,13 @@ with col1:
 # === RIGHT COLUMN: INFO PANEL ===
 with col2:
     # ---------------------------------------------------------
-    # 1. LOGO SECTION
+    # 1. LOGO SECTION (UPDATED)
     # ---------------------------------------------------------
-    # If you have a logo file (e.g., logo.png), upload it to 
-    # your Streamlit folder and UNCOMMENT the line below:
-    
+    # To use a real image, upload 'logo.png' to your folder and uncomment next line:
     # st.image("logo.png", width=150)
     
-    # For now, we use a nice Text Header instead of the tooth emoji
-    st.markdown("## 🏥 Miami Dental") 
+    # Using a clean text header instead of the tooth emoji
+    st.markdown("## Miami Dental Clinic") 
 
     st.markdown("---")
     st.markdown("""
@@ -307,8 +305,12 @@ with col2:
     Al Rigga Metro is the nearest metro station (Exit 2).
     """)
     st.write("")
+    
+    # ---------------------------------------------------------
+    # 2. OPERATING HOURS (CLOCK REMOVED)
+    # ---------------------------------------------------------
     st.markdown("""
-    ### 🕒 Operating Hours
+    ### Operating Hours
     
     **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
     **Tuesday:** 12:00 PM – 10:00 PM
@@ -317,7 +319,7 @@ with col2:
     st.markdown("---")
     
     # ---------------------------------------------------------
-    # 2. UPDATED MAP LINK
+    # 3. UPDATED MAP LINK (EXACT URL)
     # ---------------------------------------------------------
     st.markdown("📍 **[View on Google Map](maps.app.goo.gl/ehSWvb1f4zYEanbs8?g_st=com.google.maps.preview.copy)**")
     
