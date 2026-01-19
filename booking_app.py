@@ -91,10 +91,20 @@ def get_sheet_connection():
 
 try:
     SHEET = get_sheet_connection()
-    ws_new = SHEET.worksheet("New_Users")
+    
+    # 1. READ ONLY: Existing Database
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # Return Booking Sheet
+    # 2. NEW PATIENTS DESTINATION (Renamed from Final_Bookings to New_Users_Booking)
+    try:
+        ws_new_booking = SHEET.worksheet("New_Users_Booking")
+    except:
+        ws_new_booking = SHEET.add_worksheet(title="New_Users_Booking", rows="1000", cols="20")
+        ws_new_booking.append_row([
+            "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
+        ])
+
+    # 3. RETURN PATIENTS DESTINATION
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
@@ -122,20 +132,20 @@ with col1:
         st.markdown("#### 1. Full Name")
         c1, c2 = st.columns(2)
         with c1:
-            first_name = st.text_input("First Name", placeholder="e.g. John")
+            first_name = st.text_input("First Name", placeholder="e.g. John", key="new_fname")
         with c2:
-            last_name = st.text_input("Last Name", placeholder="e.g. Doe")
+            last_name = st.text_input("Last Name", placeholder="e.g. Doe", key="new_lname")
         
         st.markdown("#### 2. Phone Number (WhatsApp)")
-        phone = st.text_input("Phone Number", placeholder="+971 ...")
+        phone = st.text_input("Phone Number", placeholder="+971 ...", key="new_phone")
         
         st.markdown("#### 3. Preferred Appointment")
         d_col, t_col = st.columns(2)
         with d_col:
-            date = st.date_input("Preferred Date", min_value=datetime.date.today())
+            date = st.date_input("Preferred Date", min_value=datetime.date.today(), key="new_date")
         with t_col:
             valid_slots = get_valid_time_slots(date)
-            time_str = st.selectbox("Available Time Slots", valid_slots)
+            time_str = st.selectbox("Available Time Slots", valid_slots, key="new_time")
 
         st.markdown("#### 4. Select Treatments")
         treatments_list_new = [
@@ -149,25 +159,33 @@ with col1:
         selected_treatments = []
         for i, treat in enumerate(treatments_list_new):
             target_col = tc1 if i % 2 == 0 else tc2
-            if target_col.checkbox(treat):
+            if target_col.checkbox(treat, key=f"new_treat_{i}"):
                 selected_treatments.append(treat)
         
         st.write("")
-        if st.button("Book now", type="primary"):
+        if st.button("Book now", type="primary", key="new_submit"):
             if first_name and last_name and phone:
                 full_name = f"{first_name} {last_name}"
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
-                timestamp = str(datetime.datetime.now())
                 
                 try:
-                    ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
+                    # Save to the RENAMED sheet: New_Users_Booking
+                    ws_new_booking.append_row([
+                        full_name, 
+                        phone, 
+                        str(date), 
+                        time_str, 
+                        treatments_str, 
+                        "this patient needs to assign doctor", 
+                        "Confirmed"
+                    ])
                     st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
                 except Exception as e:
                     st.error(f"Error saving data: {e}")
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (WITH HIDDEN INFO) ---
+    # --- TAB 2: RETURN PATIENT ---
     with tab2:
         st.markdown("#### Verify Identity")
         
@@ -212,9 +230,7 @@ with col1:
             
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
             
-            # HIDDEN FROM UI, BUT AVAILABLE FOR SAVING
-            # We don't show p_file or p_dob here anymore.
-            
+            # Hidden Info (File # / DOB)
             st.success(f"Welcome Back, **{p_name}**!")
             
             if st.button("Change User"):
@@ -243,9 +259,9 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- FINAL CORRECT MAPPING WITH FILE # ---
+                    # --- FINAL MAPPING ---
                     save_data = [
-                        # 0. FILE # (EXACTLY AS REQUESTED)
+                        # 0. FILE #
                         user.get("FILE #") or user.get("FILE", ""), 
 
                         # 1. Patient Name
@@ -254,7 +270,7 @@ with col1:
                         # 2. Contact Number
                         user.get("Contact number") or user.get("Contact Number", ""),
                         
-                        # 3. Data of Birth (EXACT KEY)
+                        # 3. Data of Birth
                         user.get("DATE OF BIRTH", ""),
                         
                         # 4. Stats
