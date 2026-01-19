@@ -81,7 +81,7 @@ def get_valid_time_slots(selected_date):
     current_h = start_h
     current_m = 0
     
-    # Loop generates slots up to the closing time (e.g., last slot 23:30 for midnight close)
+    # Loop generates slots up to the closing time
     while current_h < end_h:
         is_pm = current_h >= 12
         
@@ -143,64 +143,60 @@ with col1:
     
     # --- TAB 1: NEW PATIENT ---
     with tab1:
-        with st.form("new_patient_form"):
-            # 1. Name
-            st.markdown("#### 1. Full Name")
-            c1, c2 = st.columns(2)
-            with c1:
-                first_name = st.text_input("First Name", placeholder="e.g. John")
-            with c2:
-                last_name = st.text_input("Last Name", placeholder="e.g. Doe")
-            
-            # 2. Phone
-            st.markdown("#### 2. Phone Number (WhatsApp)")
-            phone = st.text_input("Phone Number", placeholder="+971 ...")
-            
-            # 3. Date & Time (Dynamic)
-            st.markdown("#### 3. Preferred Appointment")
-            d_col, t_col = st.columns(2)
-            with d_col:
-                date = st.date_input("Preferred Date", min_value=datetime.date.today())
-            with t_col:
-                # !!! THIS CALLS THE FUNCTION TO GET THE CORRECT SLOTS FOR THE DATE !!!
-                valid_slots = get_valid_time_slots(date)
-                time_str = st.selectbox("Available Time Slots", valid_slots)
+        # REMOVED st.form HERE so date updates happen instantly
+        st.markdown("#### 1. Full Name")
+        c1, c2 = st.columns(2)
+        with c1:
+            first_name = st.text_input("First Name", placeholder="e.g. John")
+        with c2:
+            last_name = st.text_input("Last Name", placeholder="e.g. Doe")
+        
+        st.markdown("#### 2. Phone Number (WhatsApp)")
+        phone = st.text_input("Phone Number", placeholder="+971 ...")
+        
+        st.markdown("#### 3. Preferred Appointment")
+        d_col, t_col = st.columns(2)
+        with d_col:
+            # When this changes, the app re-runs immediately
+            date = st.date_input("Preferred Date", min_value=datetime.date.today())
+        with t_col:
+            # Logic runs with NEW date and updates list
+            valid_slots = get_valid_time_slots(date)
+            time_str = st.selectbox("Available Time Slots", valid_slots)
 
-            # 4. Treatments
-            st.markdown("#### 4. Select Treatments")
-            treatments_list = [
-                "Consultation", "Scaling & Polishing", "Fillings",
-                "Root Canal (RCT)", "Teeth Whitening", "Extractions", 
-                "X-ray", "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
-            ]
-            
-            tc1, tc2 = st.columns(2)
-            selected_treatments = []
-            for i, treat in enumerate(treatments_list):
-                target_col = tc1 if i % 2 == 0 else tc2
-                if target_col.checkbox(treat):
-                    selected_treatments.append(treat)
-            
-            st.write("")
-            submitted = st.form_submit_button("Book now")
-            
-            if submitted:
-                if first_name and last_name and phone:
-                    full_name = f"{first_name} {last_name}"
-                    treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
-                    timestamp = str(datetime.datetime.now())
+        st.markdown("#### 4. Select Treatments")
+        treatments_list = [
+            "Consultation", "Scaling & Polishing", "Fillings",
+            "Root Canal (RCT)", "Teeth Whitening", "Extractions", 
+            "X-ray", "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
+        ]
+        
+        tc1, tc2 = st.columns(2)
+        selected_treatments = []
+        for i, treat in enumerate(treatments_list):
+            target_col = tc1 if i % 2 == 0 else tc2
+            if target_col.checkbox(treat):
+                selected_treatments.append(treat)
+        
+        st.write("")
+        # Standard button (not form_submit_button)
+        if st.button("Book now", type="primary"): 
+            if first_name and last_name and phone:
+                full_name = f"{first_name} {last_name}"
+                treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
+                timestamp = str(datetime.datetime.now())
+                
+                try:
+                    # Save to New Users Sheet
+                    ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
+                    # Save to Final Bookings Sheet
+                    ws_final.append_row([full_name, phone, str(date), time_str, treatments_str, "Dr. Pending", "Confirmed"])
                     
-                    try:
-                        # Save to New Users Sheet
-                        ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
-                        # Save to Final Bookings Sheet
-                        ws_final.append_row([full_name, phone, str(date), time_str, treatments_str, "Dr. Pending", "Confirmed"])
-                        
-                        st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
-                    except Exception as e:
-                        st.error(f"Error saving data: {e}")
-                else:
-                    st.warning("⚠️ Please fill in your Name and Phone Number.")
+                    st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
+                except Exception as e:
+                    st.error(f"Error saving data: {e}")
+            else:
+                st.warning("⚠️ Please fill in your Name and Phone Number.")
 
     # --- TAB 2: RETURN PATIENT ---
     with tab2:
@@ -236,34 +232,32 @@ with col1:
                 st.session_state['verified'] = False
                 st.rerun()
 
-            with st.form("return_booking_form"):
-                st.markdown("#### New Appointment Details")
-                rd_col, rt_col = st.columns(2)
-                with rd_col:
-                    r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
-                with rt_col:
-                    # !!! DYNAMIC TIME SLOTS FOR RETURN USERS TOO !!!
-                    r_valid_slots = get_valid_time_slots(r_date)
-                    r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
-                
-                r_treat = st.selectbox("Treatment Required", ["Routine Checkup", "Cleaning", "Follow-up", "Pain/Emergency"])
-                
-                r_submitted = st.form_submit_button("Confirm Booking")
-                
-                if r_submitted:
-                    try:
-                        ws_final.append_row([
-                            st.session_state['user_name'],
-                            st.session_state['user_phone'],
-                            str(r_date),
-                            r_time_str,
-                            r_treat,
-                            "Dr. Auto-Assigned",
-                            "Confirmed (Returning)"
-                        ])
-                        st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+            # REMOVED st.form HERE too for dynamic updates
+            st.markdown("#### New Appointment Details")
+            rd_col, rt_col = st.columns(2)
+            with rd_col:
+                r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
+            with rt_col:
+                # Dynamic logic
+                r_valid_slots = get_valid_time_slots(r_date)
+                r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
+            
+            r_treat = st.selectbox("Treatment Required", ["Routine Checkup", "Cleaning", "Follow-up", "Pain/Emergency"])
+            
+            if st.button("Confirm Booking"):
+                try:
+                    ws_final.append_row([
+                        st.session_state['user_name'],
+                        st.session_state['user_phone'],
+                        str(r_date),
+                        r_time_str,
+                        r_treat,
+                        "Dr. Auto-Assigned",
+                        "Confirmed (Returning)"
+                    ])
+                    st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
 # === RIGHT COLUMN: INFO PANEL ===
 with col2:
@@ -277,13 +271,24 @@ with col2:
     **office no. 104. Dubai, UAE.**
     
     The same building of Rigga Restaurant.
-    Al Rigga Metro is the nearest metro station
-    exit 2
+    Al Rigga Metro is the nearest metro station (Exit 2).
     """)
     
     st.write("")
-    st.markdown("📍 **[Google Map](https://maps.google.com)**")
+    
+    # --- FORMAL OPENING HOURS ---
+    st.markdown("""
+    ### 🕒 Operating Hours
+    
+    **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
+    
+    **Tuesday:** 12:00 PM – 10:00 PM
+    
+    **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
+    """)
+    
+    st.markdown("---")
+    st.markdown("📍 **[View on Google Map](https://maps.google.com)**")
     
     st.write("")
-    st.write("")
-    st.info("ℹ️ **Admin Note:** Data is saved securely to your Google Sheet.")
+    st.info("ℹ️ **System Status:** Online | Data is saving to Google Sheets.")
