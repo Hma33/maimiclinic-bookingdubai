@@ -10,8 +10,6 @@ st.set_page_config(page_title="Miami Dental Clinic", layout="wide")
 st.markdown("""
 <style>
     .main { background-color: #f0f2f6; }
-    
-    /* Right Column (Dark Info Panel) */
     [data-testid="column"]:nth-of-type(2) {
         background-color: #1E2A38;
         border-radius: 15px;
@@ -20,8 +18,6 @@ st.markdown("""
         text-align: center;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    
-    /* Text Color Overrides for Dark Column */
     [data-testid="column"]:nth-of-type(2) h2, 
     [data-testid="column"]:nth-of-type(2) p, 
     [data-testid="column"]:nth-of-type(2) a,
@@ -29,8 +25,6 @@ st.markdown("""
     [data-testid="column"]:nth-of-type(2) div {
         color: white !important;
     }
-
-    /* Button Styling */
     .stButton > button {
         background-color: #1E2A38;
         color: white;
@@ -50,9 +44,7 @@ st.markdown("""
 # --- 3. HELPER FUNCTION: DYNAMIC TIME SLOTS ---
 def get_valid_time_slots(selected_date):
     day_idx = selected_date.weekday() 
-    
-    # Mon-Sun Logic
-    if day_idx in [0, 3, 4, 5, 6]: 
+    if day_idx in [0, 3, 4, 5, 6]: # Mon, Thu, Fri, Sat, Sun
         start_h, end_h = 10, 24 
     elif day_idx == 1: # Tue
         start_h, end_h = 12, 22
@@ -64,7 +56,6 @@ def get_valid_time_slots(selected_date):
     slots = []
     current_h = start_h
     current_m = 0
-    
     while current_h < end_h:
         is_pm = current_h >= 12
         display_h = current_h if current_h <= 12 else current_h - 12
@@ -76,10 +67,9 @@ def get_valid_time_slots(selected_date):
         if current_m == 60:
             current_m = 0
             current_h += 1
-            
     return slots
 
-# --- 4. GOOGLE SHEETS CONNECTION & HEADERS ---
+# --- 4. GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -98,32 +88,15 @@ try:
     ws_new = SHEET.worksheet("New_Users")
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # --- HANDLING THE NEW RETURN BOOKING SHEET ---
+    # Check for or create the new Return Booking Sheet
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
-        # Create it if it doesn't exist
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
-
-    # --- AUTO-ADD HEADERS ---
-    # 1. New Users Sheet
-    if not ws_new.row_values(1):
-        ws_new.append_row(["Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Timestamp"])
-
-    # 2. Return Users Booking Sheet (The one you requested)
-    if not ws_return.row_values(1):
+        # Add Headers if creating new
         ws_return.append_row([
-            "Patient Name", 
-            "Contact Number", 
-            "Data of Birth", 
-            "Height", 
-            "Weight", 
-            "Allergy", 
-            "Appointment Date", 
-            "Time", 
-            "Treatment", 
-            "Doctor Assignment", 
-            "Status"
+            "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy",
+            "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
         ])
 
 except Exception as e:
@@ -182,7 +155,6 @@ with col1:
                 timestamp = str(datetime.datetime.now())
                 
                 try:
-                    # Save to New Users Sheet
                     ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
                     st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
                 except Exception as e:
@@ -190,60 +162,65 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT ---
+    # --- TAB 2: RETURN PATIENT (SMART DATA FETCHING) ---
     with tab2:
         st.markdown("#### Verify Identity")
         
-        # --- INITIALIZATION ---
+        # Initialize Session State
         if 'verified' not in st.session_state:
             st.session_state['verified'] = False
-            
-        # Initialize dictionary to hold user data
-        if 'user_data' not in st.session_state:
-            st.session_state['user_data'] = {
-                "name": "", "phone": "", "dob": "", 
-                "height": "", "weight": "", "allergy": ""
-            }
+            # We store the entire user dictionary
+            st.session_state['user_data'] = {} 
 
         if not st.session_state['verified']:
             phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
             
             if st.button("Find My Record"):
                 try:
-                    cell = ws_exist.find(phone_input)
-                    if cell:
-                        # Fetch the row from Existing_DB
-                        row_values = ws_exist.row_values(cell.row)
+                    # 1. Get All Records (Rows) and Headers
+                    all_records = ws_exist.get_all_records() # This reads the headers automatically!
+                    
+                    # 2. Find the user by Phone Number
+                    found_user = None
+                    # Normalize input phone (remove spaces)
+                    clean_input_phone = str(phone_input).strip().replace(" ", "")
+                    
+                    for record in all_records:
+                        # Try to find the 'Contact Number' column. 
+                        # We use loose matching in case header is 'Contact No' or 'Phone'
+                        # But since you said 'Contact Number', we look for that key.
                         
+                        # Get phone from record (convert to string to be safe)
+                        record_phone = str(record.get("Contact Number", "")).strip().replace(" ", "")
+                        
+                        if clean_input_phone in record_phone and clean_input_phone != "":
+                            found_user = record
+                            break
+                    
+                    if found_user:
                         st.session_state['verified'] = True
-                        
-                        # --- SAFE DATA FETCHING (Handle missing columns) ---
-                        # Assumed Structure: Name(0), Phone(1), DOB(2), Height(3), Weight(4), Allergy(5)
-                        def get_val(idx): return row_values[idx] if len(row_values) > idx else ""
-                        
-                        st.session_state['user_data'] = {
-                            "name": get_val(0),
-                            "phone": phone_input,
-                            "dob": get_val(2),
-                            "height": get_val(3),
-                            "weight": get_val(4),
-                            "allergy": get_val(5)
-                        }
-                        
-                        st.rerun() 
+                        st.session_state['user_data'] = found_user
+                        st.rerun()
                     else:
-                        st.error("Number not found in existing records.")
+                        st.error("Phone number not found in 'Existing_DB'. Please check the number or register as New.")
+                        
                 except Exception as e:
-                    st.error(f"Error finding record: {e}")
+                    st.error(f"Error reading database: {e}")
         
         else:
-            # --- DISPLAY INFO ---
-            # Show Welcome message using the stored name
-            u = st.session_state['user_data']
-            st.success(f"Welcome Back, {u['name']}! (DOB: {u['dob']})")
+            # --- DISPLAY FETCHED DATA ---
+            user = st.session_state['user_data']
+            
+            # Safe Get: Uses the exact headers you provided, defaults to "N/A" if missing
+            p_name = user.get("Patient Name", "Valued Patient")
+            p_dob  = user.get("Data of Birth", "N/A") 
+            
+            st.success(f"Welcome Back, **{p_name}**!")
+            st.info(f"📅 **Date of Birth:** {p_dob}")
             
             if st.button("Change User"):
                 st.session_state['verified'] = False
+                st.session_state['user_data'] = {}
                 st.rerun()
 
             st.markdown("---")
@@ -267,23 +244,28 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # COPY DATA FROM EXISTING_DB + ADD NEW BOOKING DATA
-                    ws_return.append_row([
-                        u['name'],          # Patient Name
-                        u['phone'],         # Contact Number
-                        u['dob'],           # Date of Birth
-                        u['height'],        # Height
-                        u['weight'],        # Weight
-                        u['allergy'],       # Allergy
-                        str(r_date),        # Appointment Date
-                        r_time_str,         # Time
-                        r_treat,            # Treatment
-                        "this patient needs to assign doctor", # Doctor Assignment
-                        "Confirmed (Returning)" # Status
-                    ])
+                    # Prepare Data to Copy
+                    # We fetch exactly the fields you requested from the session state
+                    save_data = [
+                        user.get("Patient Name", ""),
+                        user.get("Contact Number", ""),
+                        user.get("Data of Birth", ""),
+                        user.get("Height", ""),
+                        user.get("Weight", ""),
+                        user.get("Allergy", ""),
+                        str(r_date),
+                        r_time_str,
+                        r_treat,
+                        "this patient needs to assign doctor",
+                        "Confirmed (Returning)"
+                    ]
+                    
+                    # Save to the NEW sheet: Existing_Users_Booking
+                    ws_return.append_row(save_data)
                     st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
+                    
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error saving booking: {e}")
 
 # === RIGHT COLUMN: INFO PANEL ===
 with col2:
