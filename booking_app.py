@@ -92,18 +92,14 @@ def get_sheet_connection():
 try:
     SHEET = get_sheet_connection()
     
-    # 1. New Registration Sheets
+    # 1. New Registration Sheet (Consolidated)
     try:
-        ws_new = SHEET.worksheet("New_Users")
+        ws_new_booking = SHEET.worksheet("New_Users_Booking")
     except:
-        ws_new = SHEET.add_worksheet(title="New_Users", rows="1000", cols="20")
-        ws_new.append_row(["Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Timestamp"])
-
-    try:
-        ws_final = SHEET.worksheet("Final_Bookings")
-    except:
-        ws_final = SHEET.add_worksheet(title="Final_Bookings", rows="1000", cols="20")
-        ws_final.append_row(["Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"])
+        ws_new_booking = SHEET.add_worksheet(title="New_Users_Booking", rows="1000", cols="20")
+        ws_new_booking.append_row([
+            "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
+        ])
 
     # 2. Existing DB (Read Only)
     ws_exist = SHEET.worksheet("Existing_DB")
@@ -171,14 +167,10 @@ with col1:
             if first_name and last_name and phone:
                 full_name = f"{first_name} {last_name}"
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
-                timestamp = str(datetime.datetime.now())
                 
                 try:
-                    # 1. Save to New_Users
-                    ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
-                    
-                    # 2. Save to Final_Bookings
-                    ws_final.append_row([
+                    # Save to SINGLE sheet: New_Users_Booking
+                    ws_new_booking.append_row([
                         full_name, 
                         phone, 
                         str(date), 
@@ -187,7 +179,6 @@ with col1:
                         "this patient needs to assign doctor", 
                         "Confirmed"
                     ])
-                    # UPDATED MESSAGE HERE
                     st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
                     st.error(f"Error saving data: {e}")
@@ -296,7 +287,6 @@ with col1:
                     ]
                     
                     ws_return.append_row(save_data)
-                    # UPDATED MESSAGE HERE
                     st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
                     st.error(f"Error saving booking: {e}")
