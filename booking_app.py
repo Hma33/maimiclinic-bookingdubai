@@ -92,19 +92,23 @@ def get_sheet_connection():
 try:
     SHEET = get_sheet_connection()
     
-    # 1. READ ONLY: Existing Database
+    # 1. New Registration Sheets
+    try:
+        ws_new = SHEET.worksheet("New_Users")
+    except:
+        ws_new = SHEET.add_worksheet(title="New_Users", rows="1000", cols="20")
+        ws_new.append_row(["Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Timestamp"])
+
+    try:
+        ws_final = SHEET.worksheet("Final_Bookings")
+    except:
+        ws_final = SHEET.add_worksheet(title="Final_Bookings", rows="1000", cols="20")
+        ws_final.append_row(["Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"])
+
+    # 2. Existing DB (Read Only)
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # 2. NEW PATIENTS DESTINATION (Renamed from Final_Bookings to New_Users_Booking)
-    try:
-        ws_new_booking = SHEET.worksheet("New_Users_Booking")
-    except:
-        ws_new_booking = SHEET.add_worksheet(title="New_Users_Booking", rows="1000", cols="20")
-        ws_new_booking.append_row([
-            "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
-        ])
-
-    # 3. RETURN PATIENTS DESTINATION
+    # 3. Return Patient Booking Sheet
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
@@ -132,20 +136,20 @@ with col1:
         st.markdown("#### 1. Full Name")
         c1, c2 = st.columns(2)
         with c1:
-            first_name = st.text_input("First Name", placeholder="e.g. John", key="new_fname")
+            first_name = st.text_input("First Name", placeholder="e.g. John", key="n_fname")
         with c2:
-            last_name = st.text_input("Last Name", placeholder="e.g. Doe", key="new_lname")
+            last_name = st.text_input("Last Name", placeholder="e.g. Doe", key="n_lname")
         
         st.markdown("#### 2. Phone Number (WhatsApp)")
-        phone = st.text_input("Phone Number", placeholder="+971 ...", key="new_phone")
+        phone = st.text_input("Phone Number", placeholder="+971 ...", key="n_phone")
         
         st.markdown("#### 3. Preferred Appointment")
         d_col, t_col = st.columns(2)
         with d_col:
-            date = st.date_input("Preferred Date", min_value=datetime.date.today(), key="new_date")
+            date = st.date_input("Preferred Date", min_value=datetime.date.today(), key="n_date")
         with t_col:
             valid_slots = get_valid_time_slots(date)
-            time_str = st.selectbox("Available Time Slots", valid_slots, key="new_time")
+            time_str = st.selectbox("Available Time Slots", valid_slots, key="n_time")
 
         st.markdown("#### 4. Select Treatments")
         treatments_list_new = [
@@ -159,18 +163,22 @@ with col1:
         selected_treatments = []
         for i, treat in enumerate(treatments_list_new):
             target_col = tc1 if i % 2 == 0 else tc2
-            if target_col.checkbox(treat, key=f"new_treat_{i}"):
+            if target_col.checkbox(treat, key=f"n_treat_{i}"):
                 selected_treatments.append(treat)
         
         st.write("")
-        if st.button("Book now", type="primary", key="new_submit"):
+        if st.button("Book now", type="primary", key="n_submit"):
             if first_name and last_name and phone:
                 full_name = f"{first_name} {last_name}"
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
+                timestamp = str(datetime.datetime.now())
                 
                 try:
-                    # Save to the RENAMED sheet: New_Users_Booking
-                    ws_new_booking.append_row([
+                    # 1. Save to New_Users
+                    ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
+                    
+                    # 2. Save to Final_Bookings
+                    ws_final.append_row([
                         full_name, 
                         phone, 
                         str(date), 
@@ -179,7 +187,8 @@ with col1:
                         "this patient needs to assign doctor", 
                         "Confirmed"
                     ])
-                    st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
+                    # UPDATED MESSAGE HERE
+                    st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
                     st.error(f"Error saving data: {e}")
             else:
@@ -230,7 +239,7 @@ with col1:
             
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
             
-            # Hidden Info (File # / DOB)
+            # HIDDEN FROM UI
             st.success(f"Welcome Back, **{p_name}**!")
             
             if st.button("Change User"):
@@ -287,7 +296,8 @@ with col1:
                     ]
                     
                     ws_return.append_row(save_data)
-                    st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
+                    # UPDATED MESSAGE HERE
+                    st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
                     st.error(f"Error saving booking: {e}")
 
