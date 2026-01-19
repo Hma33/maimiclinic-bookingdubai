@@ -9,12 +9,11 @@ st.set_page_config(page_title="Miami Dental Clinic", layout="wide")
 # --- 2. CUSTOM CSS STYLING ---
 st.markdown("""
 <style>
-    /* Main Background */
     .main { background-color: #f0f2f6; }
     
-    /* Right Column (Dark Info Panel) Styling */
+    /* Right Column (Dark Info Panel) */
     [data-testid="column"]:nth-of-type(2) {
-        background-color: #1E2A38; /* Dark Navy Blue */
+        background-color: #1E2A38;
         border-radius: 15px;
         padding: 30px;
         color: white;
@@ -22,7 +21,7 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
     
-    /* Force Text Colors in the Dark Column to White */
+    /* Text Color Overrides for Dark Column */
     [data-testid="column"]:nth-of-type(2) h2, 
     [data-testid="column"]:nth-of-type(2) p, 
     [data-testid="column"]:nth-of-type(2) a,
@@ -31,7 +30,7 @@ st.markdown("""
         color: white !important;
     }
 
-    /* Submit Button Styling */
+    /* Button Styling */
     .stButton > button {
         background-color: #1E2A38;
         color: white;
@@ -50,32 +49,18 @@ st.markdown("""
 
 # --- 3. HELPER FUNCTION: DYNAMIC TIME SLOTS ---
 def get_valid_time_slots(selected_date):
-    """
-    Generates 30-minute time slots based on the clinic's specific schedule.
-    """
     day_idx = selected_date.weekday() 
     
-    # --- LOGIC FOR HOURS ---
-    # Case A: Mon, Thu, Fri, Sat, Sun -> 10:00 AM to 12:00 AM (Midnight)
+    # Mon-Sun Logic
     if day_idx in [0, 3, 4, 5, 6]: 
-        start_h = 10
-        end_h = 24  # 24 represents Midnight
-        
-    # Case B: Tuesday -> 12:00 PM to 10:00 PM
-    elif day_idx == 1: 
-        start_h = 12
-        end_h = 22  # 22 is 10 PM
-        
-    # Case C: Wednesday -> 02:00 PM to 12:00 AM (Midnight)
-    elif day_idx == 2: 
-        start_h = 14  # 14 is 2 PM
-        end_h = 24
-        
+        start_h, end_h = 10, 24 
+    elif day_idx == 1: # Tue
+        start_h, end_h = 12, 22
+    elif day_idx == 2: # Wed
+        start_h, end_h = 14, 24
     else:
-        # Fallback
         start_h, end_h = 9, 17
 
-    # --- GENERATE SLOTS ---
     slots = []
     current_h = start_h
     current_m = 0
@@ -99,7 +84,7 @@ def get_valid_time_slots(selected_date):
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     if "gcp_service_account" not in st.secrets:
-        st.error("Missing 'gcp_service_account' in .streamlit/secrets.toml")
+        st.error("Missing 'gcp_service_account' in secrets.")
         st.stop()
     creds_dict = dict(st.secrets["gcp_service_account"])
     if "\\n" in creds_dict["private_key"]:
@@ -120,7 +105,7 @@ except Exception as e:
 # --- 5. APP LAYOUT ---
 col1, col2 = st.columns([2, 1], gap="large")
 
-# === LEFT COLUMN: THE FORMS ===
+# === LEFT COLUMN: FORMS ===
 with col1:
     st.title("Dental Clinic Appointment and Treatment Form")
     
@@ -194,36 +179,29 @@ with col1:
         if 'last_visit' not in st.session_state:
             st.session_state['last_visit'] = "Unknown"
 
-        # Step 1: Verification
         if not st.session_state['verified']:
             phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
             
             if st.button("Find My Record"):
                 try:
-                    # Finds the cell containing the phone number
                     cell = ws_exist.find(phone_input)
-                    
                     if cell:
-                        # Get the entire row of data
                         user_data = ws_exist.row_values(cell.row)
-                        
-                        # ### COLUMN MAPPING ###
-                        # Change these numbers if your columns are different
-                        # Index 0 = Column A (Name)
-                        # Index 1 = Column B (Phone)
-                        # Index 2 = Column C (Last Visit Date)
                         
                         st.session_state['verified'] = True
                         
-                        # 1. Get Name (Assumed Column A / Index 0)
-                        if len(user_data) > 0:
-                            st.session_state['user_name'] = user_data[0]
+                        # --- FIX: SWAPPED INDICES BASED ON YOUR ERROR REPORT ---
+                        # Based on your report, Date is at Index 0, Name is at Index 2
+                        
+                        # 1. Get Name (Index 2)
+                        if len(user_data) > 2:
+                            st.session_state['user_name'] = user_data[2]
                         else:
                             st.session_state['user_name'] = "Valued Patient"
 
-                        # 2. Get Last Visit (Assumed Column C / Index 2)
-                        if len(user_data) > 2:
-                            st.session_state['last_visit'] = user_data[2]
+                        # 2. Get Last Visit Date (Index 0)
+                        if len(user_data) > 0:
+                            st.session_state['last_visit'] = user_data[0]
                         else:
                             st.session_state['last_visit'] = "No prior date found"
 
@@ -234,9 +212,8 @@ with col1:
                 except Exception as e:
                     st.error(f"Error finding record: {e}")
         
-        # Step 2: Booking (Verified)
         else:
-            # --- CUSTOM WELCOME MESSAGE ---
+            # --- DISPLAY INFO ---
             st.success(f"Welcome Back!!! Last Time You Went: {st.session_state['last_visit']}")
             st.markdown(f"### Booking for: **{st.session_state['user_name']}**")
             
@@ -247,7 +224,6 @@ with col1:
             st.markdown("---")
             st.markdown("#### New Appointment Details")
             
-            # Dynamic Date & Time (No form wrapper)
             rd_col, rt_col = st.columns(2)
             with rd_col:
                 r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
@@ -255,21 +231,12 @@ with col1:
                 r_valid_slots = get_valid_time_slots(r_date)
                 r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
             
-            # Full Treatment List for Return Patients
             full_treatments_list = [
-                "Consult with professionals",
-                "Scaling & Polishing",
-                "Fillings",
-                "Root Canal Treatment (RCT)",
-                "Teeth Whitening",
-                "Routine and Wisdom Teeth Extractions",
-                "Panoramic and Periapical X-ray",
-                "Crown & Bridge",
-                "Veneers",
-                "Kids Treatment",
-                "Partial & Full Denture"
+                "Consult with professionals", "Scaling & Polishing", "Fillings",
+                "Root Canal Treatment (RCT)", "Teeth Whitening", 
+                "Routine and Wisdom Teeth Extractions", "Panoramic and Periapical X-ray",
+                "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
             ]
-            
             r_treat = st.selectbox("Treatment Required", full_treatments_list)
             
             st.write("")
@@ -293,7 +260,6 @@ with col2:
     st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
     st.markdown("## Miami Dental Clinic")
     st.markdown("---")
-    
     st.markdown("""
     **Muraqqabat road, REQA bldg. 1st floor,**
     **office no. 104. Dubai, UAE.**
@@ -306,9 +272,7 @@ with col2:
     ### 🕒 Operating Hours
     
     **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
-    
     **Tuesday:** 12:00 PM – 10:00 PM
-    
     **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
     """)
     st.markdown("---")
