@@ -78,21 +78,35 @@ def get_valid_time_slots(selected_date):
 # --- 5. GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def get_sheet_connection():
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    # Define the scope
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    # Check if secrets exist
     if "gcp_service_account" not in st.secrets:
-        st.error("Missing 'gcp_service_account' in secrets.")
+        st.error("Missing 'gcp_service_account' in secrets.toml")
         st.stop()
+        
+    # Convert secrets to a standard dict
     creds_dict = dict(st.secrets["gcp_service_account"])
-    if "\\n" in creds_dict["private_key"]:
+    
+    # Fix the private key format (replace literal \n with actual newlines)
+    if "private_key" in creds_dict:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+
+    # Create credentials
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
+    
+    # Open the sheet
     return client.open("Clinic_Booking_System")
 
 try:
     SHEET = get_sheet_connection()
     
-    # 1. New Registration Sheet (Consolidated)
+    # 1. New Registration Sheet
     try:
         ws_new_booking = SHEET.worksheet("New_Users_Booking")
     except:
@@ -101,7 +115,7 @@ try:
             "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
         ])
 
-    # 2. Existing DB (Read Only)
+    # 2. Existing DB
     ws_exist = SHEET.worksheet("Existing_DB")
     
     # 3. Return Patient Booking Sheet
@@ -169,7 +183,6 @@ with col1:
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
                 
                 try:
-                    # Save to SINGLE sheet: New_Users_Booking
                     ws_new_booking.append_row([
                         full_name, 
                         phone, 
@@ -209,10 +222,9 @@ with col1:
                             sheet_phone_raw = str(clean_record.get("Contact number", "") or clean_record.get("Contact Number", ""))
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
-                            if clean_input in sheet_phone_clean or sheet_phone_clean in clean_input:
-                                if sheet_phone_clean != "": 
-                                    found_user = clean_record
-                                    break
+                            if clean_input in sheet_phone_clean and sheet_phone_clean != "":
+                                found_user = clean_record
+                                break
                         
                         if found_user:
                             st.session_state['verified'] = True
@@ -225,10 +237,8 @@ with col1:
                     st.error(f"Error reading database: {e}")
         
         else:
-            # --- DISPLAY INFO ---
             user = st.session_state['user_data']
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
-            
             st.success(f"Welcome Back, **{p_name}**!")
             
             if st.button("Change User"):
@@ -258,7 +268,6 @@ with col1:
             if st.button("Confirm Booking"):
                 try:
                     re_data = user.get("RE") or user.get("Re") or user.get("re", "")
-                    
                     save_data = [
                         user.get("FILE #") or user.get("FILE", ""), 
                         user.get("PATIENT NAME") or user.get("Patient Name", ""),
@@ -274,7 +283,6 @@ with col1:
                         "this patient needs to assign doctor",
                         "Confirmed (Returning)"
                     ]
-                    
                     ws_return.append_row(save_data)
                     st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
@@ -282,15 +290,8 @@ with col1:
 
 # === RIGHT COLUMN: INFO PANEL ===
 with col2:
-    # ---------------------------------------------------------
-    # 1. LOGO SECTION (NO TOOTH EMOJI)
-    # ---------------------------------------------------------
-    # Upload 'logo.png' to your folder and uncomment next line:
-    # st.image("logo.png", width=150)
-    
-    # Text Header Fallback
-    st.markdown("## Miami Dental Clinic") 
-
+    st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
+    st.markdown("## Miami Dental Clinic")
     st.markdown("---")
     st.markdown("""
     **Muraqqabat road, REQA bldg. 1st floor,**
@@ -300,23 +301,13 @@ with col2:
     Al Rigga Metro is the nearest metro station (Exit 2).
     """)
     st.write("")
-    
-    # ---------------------------------------------------------
-    # 2. OPERATING HOURS (NO CLOCK EMOJI)
-    # ---------------------------------------------------------
     st.markdown("""
-    ### Operating Hours
-    
+    ### 🕒 Operating Hours
     **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
     **Tuesday:** 12:00 PM – 10:00 PM
     **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
     """)
     st.markdown("---")
-    
-    # ---------------------------------------------------------
-    # 3. UPDATED MAP LINK (EXACT URL)
-    # ---------------------------------------------------------
-    st.markdown("📍 **[View on Google Map](maps.app.goo.gl/ehSWvb1f4zYEanbs8?g_st=com.google.maps.preview.copy)**")
-    
+    st.markdown("📍 **[View on Google Map](https://maps.google.com)**")
     st.write("")
     st.info("ℹ️ **System Status:** Online | Data is saving to Google Sheets.")
