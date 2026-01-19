@@ -180,39 +180,59 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (UPDATED) ---
+    # --- TAB 2: RETURN PATIENT ---
     with tab2:
         st.markdown("#### Verify Identity")
         
+        # --- SAFE INITIALIZATION ---
         if 'verified' not in st.session_state:
             st.session_state['verified'] = False
+        if 'user_name' not in st.session_state:
             st.session_state['user_name'] = ""
+        if 'user_phone' not in st.session_state:
             st.session_state['user_phone'] = ""
+        if 'last_visit' not in st.session_state:
             st.session_state['last_visit'] = "Unknown"
 
         # Step 1: Verification
         if not st.session_state['verified']:
             phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
+            
             if st.button("Find My Record"):
                 try:
+                    # Finds the cell containing the phone number
                     cell = ws_exist.find(phone_input)
+                    
                     if cell:
+                        # Get the entire row of data
                         user_data = ws_exist.row_values(cell.row)
-                        st.session_state['verified'] = True
-                        st.session_state['user_name'] = user_data[0] # Assumes Name is Column 1
-                        st.session_state['user_phone'] = phone_input
                         
-                        # Try to get Last Visit Date (Assumes it is in Column 3)
-                        if len(user_data) > 2:
-                            st.session_state['last_visit'] = user_data[2] 
+                        # ### COLUMN MAPPING ###
+                        # Change these numbers if your columns are different
+                        # Index 0 = Column A (Name)
+                        # Index 1 = Column B (Phone)
+                        # Index 2 = Column C (Last Visit Date)
+                        
+                        st.session_state['verified'] = True
+                        
+                        # 1. Get Name (Assumed Column A / Index 0)
+                        if len(user_data) > 0:
+                            st.session_state['user_name'] = user_data[0]
                         else:
-                            st.session_state['last_visit'] = "No prior visit recorded"
-                            
+                            st.session_state['user_name'] = "Valued Patient"
+
+                        # 2. Get Last Visit (Assumed Column C / Index 2)
+                        if len(user_data) > 2:
+                            st.session_state['last_visit'] = user_data[2]
+                        else:
+                            st.session_state['last_visit'] = "No prior date found"
+
+                        st.session_state['user_phone'] = phone_input
                         st.rerun() 
                     else:
                         st.error("Number not found in existing records.")
                 except Exception as e:
-                    st.error("Number not found or API Error.")
+                    st.error(f"Error finding record: {e}")
         
         # Step 2: Booking (Verified)
         else:
@@ -227,16 +247,15 @@ with col1:
             st.markdown("---")
             st.markdown("#### New Appointment Details")
             
-            # Dynamic Date & Time (No st.form wrapper)
+            # Dynamic Date & Time (No form wrapper)
             rd_col, rt_col = st.columns(2)
             with rd_col:
                 r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
             with rt_col:
-                # Logic refreshes automatically on date change
                 r_valid_slots = get_valid_time_slots(r_date)
                 r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
             
-            # Updated Treatment List
+            # Full Treatment List for Return Patients
             full_treatments_list = [
                 "Consult with professionals",
                 "Scaling & Polishing",
