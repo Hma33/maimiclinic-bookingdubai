@@ -3,43 +3,46 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# --- 1. PAGE CONFIG ---
+# --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="Maimi Dental Clinic", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CUSTOM CSS (THE DESIGN ENGINE) ---
+# --- 2. EXACT UI STYLING (CSS) ---
 st.markdown("""
     <style>
-    /* RESET & BACKGROUND */
-    .stApp {
-        background-color: #0E1621; /* Deep Navy Background */
-        font-family: 'Arial', sans-serif;
-    }
+    /* IMPORT FONT (Source Sans Pro matches your design) */
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
+
+    /* GLOBAL RESET */
+    * { font-family: 'Source Sans Pro', sans-serif; }
     
-    /* HIDE STREAMLIT ELEMENTS */
+    /* BACKGROUND COLOR - Dark Navy */
+    .stApp {
+        background-color: #0d223f;
+    }
+
+    /* HIDE DEFAULT STREAMLIT HEADER */
     header {visibility: hidden;}
-    footer {visibility: hidden;}
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
         max_width: 1200px;
     }
 
-    /* --- LEFT CARD: THE FORM (White) --- */
-    /* We target the specific container for the left column */
+    /* --- LEFT CARD (The Form) --- */
+    /* We target the first column's internal div */
     div[data-testid="column"]:nth-of-type(1) > div {
-        background-color: #FFFFFF;
+        background-color: #ffffff;
         padding: 40px;
-        border-radius: 8px 0px 0px 8px; /* Rounded Left Corners */
-        height: 800px; /* Fixed height for alignment */
-        overflow-y: auto;
+        border-radius: 5px 0px 0px 5px; /* Matches your image radius */
+        min-height: 850px;
     }
 
-    /* --- RIGHT CARD: THE INFO (Dark) --- */
+    /* --- RIGHT CARD (The Info) --- */
     div[data-testid="column"]:nth-of-type(2) > div {
-        background-color: #151f2b; /* Slightly lighter navy for contrast */
+        background-color: #1e2227; /* Darker card color */
         padding: 40px;
-        border-radius: 0px 8px 8px 0px; /* Rounded Right Corners */
-        height: 800px;
+        border-radius: 0px 5px 5px 0px;
+        min-height: 850px;
         color: white;
         display: flex;
         flex-direction: column;
@@ -47,56 +50,80 @@ st.markdown("""
         text-align: center;
     }
 
-    /* --- INPUT FIELDS STYLING --- */
-    /* Remove default borders and make them light grey */
+    /* --- INPUT FIELDS (The Grey Boxes) --- */
+    /* Remove borders, add grey background */
     .stTextInput input, .stDateInput input, .stTimeInput input {
-        background-color: #E6E8EA !important;
+        background-color: #E5E7EB !important; /* Light grey like your design */
         border: none !important;
-        color: #333 !important;
-        border-radius: 4px !important;
-    }
-    /* Labels */
-    .stMarkdown p {
-        font-size: 14px;
-        font-weight: 500;
-        color: #333;
+        color: #000 !important;
+        border-radius: 0px !important; /* Square edges as per design */
+        padding: 10px;
     }
     
+    /* HIDE LABELS for cleaner look (We use custom headers instead) */
+    .stTextInput label, .stDateInput label, .stTimeInput label {
+        display: none;
+    }
+
     /* --- TABS STYLING --- */
+    /* Tab Bar */
     .stTabs [data-baseweb="tab-list"] {
         gap: 20px;
+        border-bottom: 1px solid #ddd;
     }
+    /* Individual Tab Text */
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         white-space: pre-wrap;
         background-color: transparent;
         border-radius: 0px;
-        color: #666;
+        color: #000;
+        font-size: 16px;
+        font-weight: 400;
+    }
+    /* Active Tab (Red Underline) */
+    .stTabs [aria-selected="true"] {
+        color: #000 !important;
+        border-bottom: 3px solid #b91c1c !important; /* The Red Line */
         font-weight: 600;
     }
-    .stTabs [aria-selected="true"] {
-        color: #0E1621 !important;
-        border-bottom: 3px solid #b91c1c !important; /* The Red Underline */
-    }
 
-    /* --- BUTTON STYLING --- */
+    /* --- BUTTON STYLING (Dark Blue "Book Now") --- */
     div[data-testid="stFormSubmitButton"] button {
-        background-color: #0E1621;
+        background-color: #0d223f;
         color: white;
         border: none;
-        padding: 12px 24px;
-        font-weight: bold;
-        width: 150px;
+        padding: 10px 20px;
+        font-weight: 600;
         border-radius: 4px;
         transition: background 0.3s;
+        width: 120px; 
     }
     div[data-testid="stFormSubmitButton"] button:hover {
-        background-color: #2c3e50;
+        background-color: #1a3a6c;
     }
     
-    /* Checkbox spacing */
-    div[data-baseweb="checkbox"] {
-        margin-bottom: 8px;
+    /* --- CHECKBOX STYLING --- */
+    /* Reduce spacing */
+    div[data-testid="stCheckbox"] {
+        margin-bottom: -15px; 
+    }
+    div[data-testid="stCheckbox"] label span {
+        font-size: 12px; /* Smaller font for treatments */
+    }
+
+    /* Custom Headers like "1. Full Name" */
+    .form-header {
+        font-size: 14px;
+        font-weight: 600;
+        margin-top: 20px;
+        margin-bottom: 5px;
+        color: #000;
+    }
+    .sub-label {
+        font-size: 12px;
+        color: #333;
+        margin-bottom: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -121,131 +148,156 @@ except Exception as e:
     st.error(f"Connection Error: {e}")
     st.stop()
 
-# --- 4. UI LAYOUT ---
-
-# Create two columns: Left (Form) and Right (Info)
+# --- 4. LAYOUT STRUCTURE ---
+# Two columns: Form (Left) and Info (Right)
 col_left, col_right = st.columns([1.5, 1], gap="small")
 
-# === RIGHT COLUMN (Static Info Card) ===
+# ================= RIGHT COLUMN (Info Card) =================
 with col_right:
-    # We use pure HTML here because this part is static
+    # Using HTML for the static dark card
     st.markdown("""
-        <div style="margin-top: 50px;">
-            <div style="background-color: #000; width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center;">
+        <div style="margin-top: 80px;">
+            <div style="
+                width: 120px; height: 120px; 
+                background-color: black; 
+                border-radius: 50%; 
+                margin: 0 auto 20px auto; 
+                display: flex; align-items: center; justify-content: center;
+                border: 2px solid #333;">
                 <span style="font-size: 40px;">🦷</span>
             </div>
-            <h2 style="color: white; margin-bottom: 40px;">Maimi Dental Clinic</h2>
             
-            <hr style="border-color: #334155; width: 80%; margin: 0 auto 30px auto; opacity: 0.3;">
+            <h2 style="color: white; font-weight: 600; margin-bottom: 60px;">Maimi Dental Clinic</h2>
             
-            <div style="text-align: center; color: #cbd5e1; font-size: 14px; line-height: 1.8;">
+            <hr style="border-color: #4B5563; width: 80%; margin: 0 auto 30px auto; opacity: 0.5;">
+            
+            <div style="text-align: center; color: #E5E7EB; font-size: 13px; line-height: 1.8;">
                 <p>Muraqqabat road, REQA bldg. 1st floor,<br>
                 office no. 104. Dubai, UAE.</p>
                 <br>
                 <p>The same building of Rigga Restaurant.<br>
-                Al Rigga Metro is the nearest metro station exit 2</p>
+                Al Rigga Metro is the nearest metro station<br>exit 2</p>
             </div>
             
             <div style="margin-top: 40px;">
-                <a href="https://maps.google.com" target="_blank" style="color: white; text-decoration: none; font-weight: bold;">
-                    📍 Google Map
+                <a href="https://maps.google.com" target="_blank" style="color: white; text-decoration: none; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <span>📍</span> Google Map
                 </a>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-# === LEFT COLUMN (Interactive Form) ===
+# ================= LEFT COLUMN (Booking Form) =================
 with col_left:
-    st.markdown("### Dental Clinic Appointment and Treatment Form")
+    st.markdown("<h3 style='margin-bottom: 20px; color: #0d223f;'>Dental Clinic Appointment and Treatment Form</h3>", unsafe_allow_html=True)
     
     # Tabs
-    tab1, tab2 = st.tabs(["New Registration", "Return"])
+    tab_new, tab_return = st.tabs(["New Registration", "Return"])
     
     # --- TAB 1: NEW REGISTRATION ---
-    with tab1:
-        with st.form("new_user_form"):
-            st.write("") # Spacer
-            st.markdown("**1. Full Name**")
+    with tab_new:
+        with st.form("new_reg_form"):
+            
+            # 1. Full Name
+            st.markdown('<div class="form-header">1. Full Name</div>', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
-            f_name = c1.text_input("First Name", label_visibility="collapsed", placeholder="First Name")
-            l_name = c2.text_input("Last Name", label_visibility="collapsed", placeholder="Last Name")
-            
-            st.markdown("**2. Phone Number (WhatsApp)**")
-            phone = st.text_input("Phone", label_visibility="collapsed", placeholder="Enter Phone Number")
-            
-            st.markdown("**3. Preferred Appointment Date and Time**")
+            with c1:
+                st.markdown('<div class="sub-label">First Name</div>', unsafe_allow_html=True)
+                f_name = st.text_input("First Name") # Label hidden by CSS
+            with c2:
+                st.markdown('<div class="sub-label">Last Name</div>', unsafe_allow_html=True)
+                l_name = st.text_input("Last Name")
+
+            # 2. Phone
+            st.markdown('<div class="form-header">2. Phone Number(WhatsApp)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sub-label">Phone Number</div>', unsafe_allow_html=True)
+            phone = st.text_input("Phone")
+
+            # 3. Date & Time
+            st.markdown('<div class="form-header">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
             c3, c4 = st.columns(2)
-            date = c3.date_input("Date", label_visibility="collapsed")
-            time = c4.time_input("Time", label_visibility="collapsed")
-            
-            st.markdown("**4. Select the Treatments**")
-            # Treatments List
-            treatments = [
+            with c3:
+                st.markdown('<div class="sub-label">Preferred Date</div>', unsafe_allow_html=True)
+                date = st.date_input("Date")
+            with c4:
+                st.markdown('<div class="sub-label">Preferred Time</div>', unsafe_allow_html=True)
+                time = st.time_input("Time")
+
+            # 4. Treatments
+            st.markdown('<div class="form-header">4. Select the Treatments</div>', unsafe_allow_html=True)
+            treatments_list = [
                 "Consult with professionals", "Scaling & Polishing", "Fillings",
                 "Root Canal Treatment (RCT)", "Teeth Whitening", 
                 "Routine and Wisdom Teeth Extractions", "Panoramic and Periapical X-ray",
                 "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
             ]
             
-            selected = []
-            for t in treatments:
+            selected_treatments = []
+            for t in treatments_list:
                 if st.checkbox(t):
-                    selected.append(t)
+                    selected_treatments.append(t)
             
-            st.write("")
-            submit = st.form_submit_button("Book now")
+            st.write("") # Spacer
             
-            if submit:
+            # Submit Button
+            submitted = st.form_submit_button("Book now")
+            
+            if submitted:
                 if f_name and phone:
                     full_name = f"{f_name} {l_name}"
-                    t_str = ", ".join(selected)
-                    # Update Sheets
+                    t_str = ", ".join(selected_treatments)
                     ws_new.append_row([full_name, phone, str(date), str(time), t_str, str(datetime.now())])
                     ws_final.append_row([full_name, phone, str(date), str(time), t_str, "New", "Confirmed"])
-                    st.success("✅ Registration Successful!")
+                    st.success("Registration Successful!")
                 else:
-                    st.error("Please fill in required fields.")
+                    st.error("Please fill in the required fields.")
 
     # --- TAB 2: RETURN USER ---
-    with tab2:
+    with tab_return:
         st.write("")
         st.markdown("**1. Verify your identity to book faster.**")
         
-        # We need a container to hold the verify state
         if 'verified' not in st.session_state:
             st.session_state.verified = False
             st.session_state.v_name = ""
 
         if not st.session_state.verified:
-            v_phone = st.text_input("Enter your registered Phone Number")
+            st.markdown('<div class="sub-label">Enter your registered Phone Number</div>', unsafe_allow_html=True)
+            v_phone = st.text_input("Verify Phone", key="v_phone_input")
+            
             if st.button("Verify me"):
                 try:
                     cell = ws_exist.find(v_phone)
-                    data = ws_exist.row_values(cell.row)
+                    row_values = ws_exist.row_values(cell.row)
                     st.session_state.verified = True
-                    st.session_state.v_name = data[0] # Name is Col 1
+                    st.session_state.v_name = row_values[0] # Assuming Name is first col
                     st.rerun()
                 except:
-                    st.error("Number not found.")
+                    st.error("Phone number not found.")
         
         else:
-            # Verified State
-            st.info(f"Welcome Back, {st.session_state.v_name}!")
+            # Verified View
+            st.success(f"Welcome Back, {st.session_state.v_name}!")
             
-            with st.form("return_form"):
-                st.markdown("**3. Preferred Appointment Date and Time**")
+            with st.form("return_booking_form"):
+                st.markdown('<div class="form-header">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
                 rc1, rc2 = st.columns(2)
-                r_date = rc1.date_input("Date")
-                r_time = rc2.time_input("Time")
-                
-                st.markdown("**4. Select Treatments**")
+                with rc1:
+                    st.markdown('<div class="sub-label">Preferred Date</div>', unsafe_allow_html=True)
+                    r_date = st.date_input("RDate")
+                with rc2:
+                    st.markdown('<div class="sub-label">Preferred Time</div>', unsafe_allow_html=True)
+                    r_time = st.time_input("RTime")
+
+                st.markdown('<div class="form-header">4. Select the Treatments</div>', unsafe_allow_html=True)
                 r_selected = []
-                for t in treatments:
+                for t in treatments_list:
                     if st.checkbox(t, key=f"r_{t}"):
                         r_selected.append(t)
-                
+
+                st.write("")
                 r_submit = st.form_submit_button("Book now")
-                
+
                 if r_submit:
                     t_str = ", ".join(r_selected)
                     ws_final.append_row([
