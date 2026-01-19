@@ -79,14 +79,22 @@ def get_valid_time_slots(selected_date):
 @st.cache_resource
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    
+    # Check if secrets exist
     if "gcp_service_account" not in st.secrets:
-        st.error("Missing 'gcp_service_account' in secrets.toml")
+        st.error("Missing 'gcp_service_account' in .streamlit/secrets.toml")
         st.stop()
+        
     creds_dict = dict(st.secrets["gcp_service_account"])
-    if "private_key" in creds_dict and "\\n" in creds_dict["private_key"]:
+    
+    # Fix private key formatting if necessary
+    if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
+    
+    # Make sure to share your Google Sheet with the client_email from your secrets!
     return client.open("Clinic_Booking_System")
 
 try:
@@ -102,6 +110,7 @@ try:
         ])
 
     # 2. Existing DB (Read Only Source)
+    # Note: Ensure this sheet exists in your Google Sheet file
     ws_exist = SHEET.worksheet("Existing_DB")
     
     # 3. Return Patient Booking Sheet (Append Target)
@@ -116,7 +125,7 @@ try:
         ])
 
 except Exception as e:
-    st.error(f"🚨 Database Connection Failed: {e}")
+    st.error(f"🚨 Database Connection Failed. Please check your secrets and sheet name. Error details: {e}")
     st.stop()
 
 # --- 6. APP LAYOUT ---
@@ -207,6 +216,7 @@ with col1:
                             clean_record = {k.strip(): v for k, v in record.items()}
                             
                             # Search Phone
+                            # Tries both 'Contact number' and 'Contact Number' just in case
                             sheet_phone_raw = str(clean_record.get("Contact number", "") or clean_record.get("Contact Number", ""))
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
@@ -261,6 +271,7 @@ with col1:
             if st.button("Confirm Booking"):
                 try:
                     # --- FINAL MAPPING (INCLUDES 'RE' DATA) ---
+                    # Handles various cases for 'RE' key
                     re_data = user.get("RE") or user.get("Re") or user.get("re", "")
                     
                     save_data = [
