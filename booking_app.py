@@ -101,15 +101,15 @@ try:
             "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
         ])
 
-    # 2. Existing DB (Read Only - Search Source)
+    # 2. Existing DB (Read Only Source)
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # 3. Return Patient Booking Sheet (Destination)
+    # 3. Return Patient Booking Sheet (Append Target)
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
-        # Initialize headers if created for the first time
+        # Headers with RE included
         ws_return.append_row([
             "FILE #", "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy", "RE",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
@@ -170,8 +170,7 @@ with col1:
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
                 
                 try:
-                    # Save to SINGLE sheet: New_Users_Booking
-                    # .append_row adds to the bottom, never deletes
+                    # Save to SINGLE sheet: New_Users_Booking (Append Only)
                     ws_new_booking.append_row([
                         full_name, 
                         phone, 
@@ -204,7 +203,7 @@ with col1:
                          st.warning("Please enter a valid number.")
                     else:
                         for record in all_records:
-                            # Clean keys (remove spaces)
+                            # Clean keys
                             clean_record = {k.strip(): v for k, v in record.items()}
                             
                             # Search Phone
@@ -262,7 +261,6 @@ with col1:
             if st.button("Confirm Booking"):
                 try:
                     # --- FINAL MAPPING (INCLUDES 'RE' DATA) ---
-                    # Smart Fetch for RE (checks RE, Re, re)
                     re_data = user.get("RE") or user.get("Re") or user.get("re", "")
                     
                     save_data = [
@@ -294,7 +292,7 @@ with col1:
                         "Confirmed (Returning)"
                     ]
                     
-                    # This strictly ADDS a new row
+                    # STRICTLY APPEND ROW (NO DELETION)
                     ws_return.append_row(save_data)
                     st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
