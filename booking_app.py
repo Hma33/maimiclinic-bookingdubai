@@ -91,10 +91,20 @@ def get_sheet_connection():
 
 try:
     SHEET = get_sheet_connection()
-    ws_new = SHEET.worksheet("New_Users")
+    
+    # 1. Existing Database (Read Only for Search)
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # Return Booking Sheet
+    # 2. New Users Booking Sheet (Renamed from Final_Bookings)
+    try:
+        ws_new_booking = SHEET.worksheet("New_Users_Booking")
+    except:
+        ws_new_booking = SHEET.add_worksheet(title="New_Users_Booking", rows="1000", cols="20")
+        ws_new_booking.append_row([
+            "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
+        ])
+
+    # 3. Existing Users Booking Sheet
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
@@ -117,29 +127,24 @@ with col1:
     
     tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
-    # --- TAB 1: NEW PATIENT (FIXED KEYS) ---
+    # --- TAB 1: NEW PATIENT ---
     with tab1:
         st.markdown("#### 1. Full Name")
         c1, c2 = st.columns(2)
         with c1:
-            # ADDED key="new_fname"
             first_name = st.text_input("First Name", placeholder="e.g. John", key="new_fname")
         with c2:
-            # ADDED key="new_lname"
             last_name = st.text_input("Last Name", placeholder="e.g. Doe", key="new_lname")
         
         st.markdown("#### 2. Phone Number (WhatsApp)")
-        # ADDED key="new_phone"
         phone = st.text_input("Phone Number", placeholder="+971 ...", key="new_phone")
         
         st.markdown("#### 3. Preferred Appointment")
         d_col, t_col = st.columns(2)
         with d_col:
-            # ADDED key="new_date"
             date = st.date_input("Preferred Date", min_value=datetime.date.today(), key="new_date")
         with t_col:
             valid_slots = get_valid_time_slots(date)
-            # ADDED key="new_time"
             time_str = st.selectbox("Available Time Slots", valid_slots, key="new_time")
 
         st.markdown("#### 4. Select Treatments")
@@ -154,20 +159,26 @@ with col1:
         selected_treatments = []
         for i, treat in enumerate(treatments_list_new):
             target_col = tc1 if i % 2 == 0 else tc2
-            # Checkbox keys must be unique too
             if target_col.checkbox(treat, key=f"new_treat_{i}"):
                 selected_treatments.append(treat)
         
         st.write("")
         if st.button("Book now", type="primary", key="new_submit"):
-            # CHECK USING SESSION STATE VARIABLES OR DIRECT VARIABLES
             if first_name and last_name and phone:
                 full_name = f"{first_name} {last_name}"
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
-                timestamp = str(datetime.datetime.now())
                 
                 try:
-                    ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
+                    # Save to 'New_Users_Booking' sheet
+                    ws_new_booking.append_row([
+                        full_name, 
+                        phone, 
+                        str(date), 
+                        time_str, 
+                        treatments_str, 
+                        "this patient needs to assign doctor", 
+                        "Confirmed"
+                    ])
                     st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
                 except Exception as e:
                     st.error(f"Error saving data: {e}")
