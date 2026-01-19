@@ -3,119 +3,112 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# --- 1. PAGE CONFIGURATION ---
+# --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Maimi Dental Clinic", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 2. ROBUST CSS STYLING ---
 st.markdown("""
     <style>
     /* IMPORT FONT */
-    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
 
-    /* GLOBAL TEXT & BACKGROUND */
-    html, body, [class*="css"] {
-        font-family: 'Source Sans Pro', sans-serif;
-    }
-    .stApp {
-        background-color: #0D223F !important; /* Global Navy Blue */
-    }
-
-    /* HIDE HEADER/FOOTER */
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        max_width: 1200px;
-    }
-
-    /* --- LEFT COLUMN: THE WHITE FORM CARD --- */
-    /* We target the 1st column and force it to be white */
-    div[data-testid="column"]:nth-of-type(1) {
-        background-color: #FFFFFF;
-        padding: 40px;
-        border-radius: 8px 0px 0px 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
+    /* GLOBAL RESET */
+    * { font-family: 'Source Sans Pro', sans-serif; }
     
-    /* FIX: Force text inside the white card to be black */
-    div[data-testid="column"]:nth-of-type(1) label,
-    div[data-testid="column"]:nth-of-type(1) p,
+    /* GLOBAL BACKGROUND (Navy Blue) */
+    .stApp {
+        background-color: #0D223F !important;
+    }
+
+    /* HIDE DEFAULT HEADER */
+    header, footer {visibility: hidden;}
+    .block-container { padding-top: 2rem; max_width: 1200px; }
+
+    /* --- LEFT COLUMN: THE WHITE FORM --- */
+    /* Target the first column specifically */
+    div[data-testid="column"]:nth-of-type(1) > div {
+        background-color: #FFFFFF !important;
+        padding: 40px !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    /* FORCE TEXT BLACK INSIDE WHITE CARD */
     div[data-testid="column"]:nth-of-type(1) h1,
     div[data-testid="column"]:nth-of-type(1) h2,
-    div[data-testid="column"]:nth-of-type(1) h3 {
+    div[data-testid="column"]:nth-of-type(1) h3,
+    div[data-testid="column"]:nth-of-type(1) p,
+    div[data-testid="column"]:nth-of-type(1) label,
+    div[data-testid="column"]:nth-of-type(1) span,
+    div[data-testid="column"]:nth-of-type(1) div {
         color: #0D223F !important;
     }
 
     /* --- RIGHT COLUMN: THE DARK INFO CARD --- */
-    /* Target the 2nd column */
-    div[data-testid="column"]:nth-of-type(2) {
-        background-color: #1E2227; /* Dark Grey/Navy */
+    div[data-testid="column"]:nth-of-type(2) > div {
+        background-color: #1E2227 !important;
         padding: 40px;
-        border-radius: 0px 8px 8px 0px;
+        border-radius: 8px;
+        height: 100%;
         color: white !important;
     }
 
     /* --- INPUT FIELDS --- */
-    /* Light Grey Background, Square corners */
-    .stTextInput input, .stDateInput input, .stTimeInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #E5E7EB !important; /* Light Grey */
-        color: #000000 !important;
-        border: none !important;
-        border-radius: 0px !important;
+    .stTextInput input, .stDateInput input, .stTimeInput input {
+        background-color: #F3F4F6 !important; /* Light Grey */
+        color: #1F2937 !important; /* Dark Grey Text */
+        border: 1px solid #E5E7EB !important;
+        border-radius: 4px !important;
         padding: 10px;
     }
-    /* Fix for date picker icon color */
-    div[data-baseweb="calendar"] {
-        background-color: white;
-    }
-
+    
     /* --- TABS --- */
     .stTabs [data-baseweb="tab-list"] {
         gap: 20px;
-        border-bottom: 1px solid #E5E7EB;
+        border-bottom: 2px solid #F3F4F6;
+        margin-bottom: 20px;
     }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         background-color: transparent;
-        border-radius: 0px;
-        color: #6B7280; /* Grey inactive */
+        color: #9CA3AF;
         font-weight: 400;
         border: none;
     }
     .stTabs [aria-selected="true"] {
-        color: #0D223F !important; /* Navy active */
-        border-bottom: 3px solid #b91c1c !important; /* Red underline */
+        color: #0D223F !important;
+        border-bottom: 3px solid #b91c1c !important; /* Red Underline */
         font-weight: 600;
     }
 
     /* --- BUTTONS --- */
     div[data-testid="stFormSubmitButton"] button {
         background-color: #0D223F;
-        color: white;
+        color: white !important;
         border: none;
-        padding: 10px 24px;
+        padding: 12px 24px;
         border-radius: 4px;
         font-weight: 600;
         width: 100%;
-        margin-top: 10px;
+        transition: background 0.2s;
     }
     div[data-testid="stFormSubmitButton"] button:hover {
         background-color: #1a3a6c;
+        color: white !important;
     }
-    
+
     /* --- CUSTOM HEADERS --- */
-    .section-num {
+    .form-step {
+        font-size: 15px;
         font-weight: 600;
         color: #0D223F;
-        font-size: 15px;
-        margin-top: 20px;
-        margin-bottom: 5px;
+        margin-top: 25px;
+        margin-bottom: 8px;
     }
     .input-label {
         font-size: 13px;
-        color: #374151; /* Dark grey text */
-        margin-bottom: 2px;
+        color: #4B5563;
+        margin-bottom: 4px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -125,6 +118,7 @@ st.markdown("""
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
+    # Fix for private key newline issue
     if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
@@ -141,28 +135,28 @@ except Exception as e:
     st.stop()
 
 # --- 4. LAYOUT ---
-col_left, col_right = st.columns([1.5, 1], gap="small")
+col_form, col_info = st.columns([1.6, 1], gap="large")
 
-# === RIGHT COLUMN (Info Card) ===
-with col_right:
-    # Use HTML markdown safely
+# === RIGHT COLUMN (Dark Info Card) ===
+with col_info:
+    # We use st.markdown with unsafe_allow_html=True to prevent the code from showing as text
     st.markdown("""
-        <div style="text-align: center; margin-top: 60px;">
+        <div style="text-align: center; margin-top: 50px;">
             <div style="
                 width: 120px; height: 120px; 
                 background-color: black; 
                 border-radius: 50%; 
-                margin: 0 auto 20px auto; 
+                margin: 0 auto 25px auto; 
                 display: flex; align-items: center; justify-content: center;
-                border: 2px solid #333;">
+                border: 2px solid #374151;">
                 <span style="font-size: 50px;">🦷</span>
             </div>
             
-            <h2 style="color: white; font-family: 'Source Sans Pro'; font-weight: 600; margin-bottom: 40px;">Maimi Dental Clinic</h2>
+            <h2 style="color: white; margin-bottom: 30px; font-weight: 600;">Maimi Dental Clinic</h2>
             
-            <hr style="border-color: #6B7280; width: 80%; margin: 0 auto 30px auto; opacity: 0.5;">
+            <hr style="border-color: #4B5563; width: 80%; margin: 0 auto 30px auto; opacity: 0.5;">
             
-            <div style="color: #D1D5DB; font-size: 13px; line-height: 1.6;">
+            <div style="color: #D1D5DB; font-size: 14px; line-height: 1.6;">
                 <p>Muraqqabat road, REQA bldg. 1st floor,<br>
                 office no. 104. Dubai, UAE.</p>
                 <br>
@@ -171,37 +165,40 @@ with col_right:
             </div>
             
             <div style="margin-top: 40px;">
-                <a href="https://maps.google.com" target="_blank" style="color: white; text-decoration: none; font-weight: 600; font-size: 13px;">
-                    📍 Google Map
+                <a href="https://maps.google.com" target="_blank" style="color: white; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+                    <span>📍</span> Google Map
                 </a>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-# === LEFT COLUMN (Form) ===
-with col_left:
+# === LEFT COLUMN (White Form Card) ===
+with col_form:
     st.markdown("### Dental Clinic Appointment and Treatment Form")
     
-    # TABS
-    tab_new, tab_return = st.tabs(["New Registration", "Return"])
+    # Custom Tabs
+    tab1, tab2 = st.tabs(["New Registration", "Return"])
     
-    # --- NEW REGISTRATION ---
-    with tab_new:
-        with st.form("new_reg"):
-            st.markdown('<div class="section-num">1. Full Name</div>', unsafe_allow_html=True)
+    # --- TAB 1: NEW REGISTRATION ---
+    with tab1:
+        with st.form("new_reg_form"):
+            # 1. Full Name
+            st.markdown('<div class="form-step">1. Full Name</div>', unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown('<div class="input-label">First Name</div>', unsafe_allow_html=True)
-                f_name = st.text_input("fname", label_visibility="collapsed")
+                fname = st.text_input("fname", label_visibility="collapsed")
             with c2:
                 st.markdown('<div class="input-label">Last Name</div>', unsafe_allow_html=True)
-                l_name = st.text_input("lname", label_visibility="collapsed")
+                lname = st.text_input("lname", label_visibility="collapsed")
             
-            st.markdown('<div class="section-num">2. Phone Number(WhatsApp)</div>', unsafe_allow_html=True)
+            # 2. Phone
+            st.markdown('<div class="form-step">2. Phone Number (WhatsApp)</div>', unsafe_allow_html=True)
             st.markdown('<div class="input-label">Phone Number</div>', unsafe_allow_html=True)
             phone = st.text_input("phone", label_visibility="collapsed")
             
-            st.markdown('<div class="section-num">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
+            # 3. Date & Time
+            st.markdown('<div class="form-step">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
             c3, c4 = st.columns(2)
             with c3:
                 st.markdown('<div class="input-label">Preferred Date</div>', unsafe_allow_html=True)
@@ -209,8 +206,9 @@ with col_left:
             with c4:
                 st.markdown('<div class="input-label">Preferred Time</div>', unsafe_allow_html=True)
                 time = st.time_input("time", label_visibility="collapsed")
-                
-            st.markdown('<div class="section-num">4. Select the Treatments</div>', unsafe_allow_html=True)
+            
+            # 4. Treatments
+            st.markdown('<div class="form-step">4. Select the Treatments</div>', unsafe_allow_html=True)
             treatments = [
                 "Consult with professionals", "Scaling & Polishing", "Fillings",
                 "Root Canal Treatment (RCT)", "Teeth Whitening", 
@@ -218,60 +216,67 @@ with col_left:
                 "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
             ]
             
-            sel = []
+            selected = []
             for t in treatments:
                 if st.checkbox(t):
-                    sel.append(t)
+                    selected.append(t)
             
             st.write("")
             submit = st.form_submit_button("Book now")
             
             if submit:
-                if f_name and phone:
-                    full = f"{f_name} {l_name}"
-                    t_str = ", ".join(sel)
-                    ws_new.append_row([full, phone, str(date), str(time), t_str, str(datetime.now())])
-                    ws_final.append_row([full, phone, str(date), str(time), t_str, "New", "Confirmed"])
+                if fname and phone:
+                    fullname = f"{fname} {lname}"
+                    t_str = ", ".join(selected)
+                    ws_new.append_row([fullname, phone, str(date), str(time), t_str, str(datetime.now())])
+                    ws_final.append_row([fullname, phone, str(date), str(time), t_str, "New", "Confirmed"])
                     st.success("Registration Successful!")
                 else:
                     st.error("Please fill in the required fields.")
 
-    # --- RETURN USER ---
-    with tab_return:
+    # --- TAB 2: RETURN USER ---
+    with tab2:
         st.write("")
         st.markdown("**1. Verify your identity to book faster.**")
         
+        # Initialize session state for verification
         if 'verified' not in st.session_state:
             st.session_state.verified = False
             st.session_state.v_name = ""
 
+        # STATE A: NOT VERIFIED
         if not st.session_state.verified:
             st.markdown('<div class="input-label">Enter your registered Phone Number</div>', unsafe_allow_html=True)
-            v_phone = st.text_input("vphone", label_visibility="collapsed")
+            v_phone = st.text_input("v_phone", label_visibility="collapsed")
             
-            # Using a normal button for verify (outside form)
-            if st.button("Verify me"):
-                try:
-                    cell = ws_exist.find(v_phone)
-                    row = ws_exist.row_values(cell.row)
-                    st.session_state.verified = True
-                    st.session_state.v_name = row[0]
-                    st.rerun()
-                except:
-                    st.error("Phone number not found.")
+            # Use columns to make the button smaller
+            b1, b2 = st.columns([1, 4])
+            with b1:
+                if st.button("Verify me"):
+                    try:
+                        cell = ws_exist.find(v_phone)
+                        row = ws_exist.row_values(cell.row)
+                        st.session_state.verified = True
+                        st.session_state.v_name = row[0]
+                        st.rerun()
+                    except:
+                        st.error("Number not found.")
+        
+        # STATE B: VERIFIED (SHOW BOOKING FORM)
         else:
-            st.info(f"Welcome Back, {st.session_state.v_name}!")
-            with st.form("return_book"):
-                st.markdown('<div class="section-num">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
+            st.success(f"Welcome back, {st.session_state.v_name}!")
+            
+            with st.form("return_booking"):
+                st.markdown('<div class="form-step">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
                 rc1, rc2 = st.columns(2)
                 with rc1:
                     st.markdown('<div class="input-label">Preferred Date</div>', unsafe_allow_html=True)
-                    r_date = st.date_input("rdate", label_visibility="collapsed")
+                    r_date = st.date_input("r_date", label_visibility="collapsed")
                 with rc2:
                     st.markdown('<div class="input-label">Preferred Time</div>', unsafe_allow_html=True)
-                    r_time = st.time_input("rtime", label_visibility="collapsed")
+                    r_time = st.time_input("r_time", label_visibility="collapsed")
                 
-                st.markdown('<div class="section-num">4. Select the Treatments</div>', unsafe_allow_html=True)
+                st.markdown('<div class="form-step">4. Select the Treatments</div>', unsafe_allow_html=True)
                 r_sel = []
                 for t in treatments:
                     if st.checkbox(t, key=f"r_{t}"):
