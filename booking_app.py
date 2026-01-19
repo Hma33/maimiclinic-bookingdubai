@@ -169,9 +169,114 @@ with col1:
     with tab2:
         st.markdown("#### Verify Identity")
         
-        # --- SAFE INITIALIZATION ---
+        # --- SAFE INITIALIZATION (Fixed Syntax Here) ---
         if 'verified' not in st.session_state:
             st.session_state['verified'] = False
         if 'user_name' not in st.session_state:
             st.session_state['user_name'] = ""
-        if 'user_phone
+        if 'user_phone' not in st.session_state:
+            st.session_state['user_phone'] = ""
+        if 'last_visit' not in st.session_state:
+            st.session_state['last_visit'] = "Unknown"
+
+        if not st.session_state['verified']:
+            phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
+            
+            if st.button("Find My Record"):
+                try:
+                    cell = ws_exist.find(phone_input)
+                    if cell:
+                        user_data = ws_exist.row_values(cell.row)
+                        
+                        st.session_state['verified'] = True
+                        st.session_state['user_phone'] = phone_input
+                        
+                        # --- CORRECTED COLUMN MAPPING ---
+                        # Index 0 (Column A) = NAME
+                        # Index 2 (Column C) = DATE
+                        
+                        # 1. Get Name from Index 0
+                        if len(user_data) > 0:
+                            st.session_state['user_name'] = user_data[0]
+                        else:
+                            st.session_state['user_name'] = "Valued Patient"
+
+                        # 2. Get Last Visit Date from Index 2
+                        if len(user_data) > 2:
+                            st.session_state['last_visit'] = user_data[2]
+                        else:
+                            st.session_state['last_visit'] = "No prior date found"
+
+                        st.rerun() 
+                    else:
+                        st.error("Number not found in existing records.")
+                except Exception as e:
+                    st.error(f"Error finding record: {e}")
+        
+        else:
+            # --- DISPLAY INFO ---
+            st.success(f"Welcome Back!!! Last Time You Went: {st.session_state['last_visit']}")
+            st.markdown(f"### Booking for: **{st.session_state['user_name']}**")
+            
+            if st.button("Change User"):
+                st.session_state['verified'] = False
+                st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### New Appointment Details")
+            
+            rd_col, rt_col = st.columns(2)
+            with rd_col:
+                r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
+            with rt_col:
+                r_valid_slots = get_valid_time_slots(r_date)
+                r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
+            
+            full_treatments_list = [
+                "Consult with professionals", "Scaling & Polishing", "Fillings",
+                "Root Canal Treatment (RCT)", "Teeth Whitening", 
+                "Routine and Wisdom Teeth Extractions", "Panoramic and Periapical X-ray",
+                "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
+            ]
+            r_treat = st.selectbox("Treatment Required", full_treatments_list)
+            
+            st.write("")
+            if st.button("Confirm Booking"):
+                try:
+                    ws_final.append_row([
+                        st.session_state['user_name'],
+                        st.session_state['user_phone'],
+                        str(r_date),
+                        r_time_str,
+                        r_treat,
+                        "this patient needs to assign doctor",
+                        "Confirmed (Returning)"
+                    ])
+                    st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+# === RIGHT COLUMN: INFO PANEL ===
+with col2:
+    st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
+    st.markdown("## Miami Dental Clinic")
+    st.markdown("---")
+    st.markdown("""
+    **Muraqqabat road, REQA bldg. 1st floor,**
+    **office no. 104. Dubai, UAE.**
+    
+    The same building of Rigga Restaurant.
+    Al Rigga Metro is the nearest metro station (Exit 2).
+    """)
+    st.write("")
+    st.markdown("""
+    ### 🕒 Operating Hours
+    
+    **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
+    **Tuesday:** 12:00 PM – 10:00 PM
+    **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
+    """)
+    st.markdown("---")
+    st.markdown("📍 **[View on Google Map](https://maps.google.com)**")
+    st.write("")
+    st.info("ℹ️ **System Status:** Online | Data is saving to Google Sheets.")
