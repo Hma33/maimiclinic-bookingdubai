@@ -1,7 +1,6 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account 
-import Credentials
+from google.oauth2.service_account import Credentials
 import datetime
 
 # --- 1. PAGE CONFIGURATION ---
@@ -323,3 +322,4 @@ with col2:
     st.markdown("📍 **[View on Google Map](https://maps.google.com)**")
     st.write("")
     st.info("ℹ️ **System Status:** Online | Data is saving to Google Sheets.")
+
