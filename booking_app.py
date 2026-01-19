@@ -20,8 +20,8 @@ st.markdown("""
     }
     [data-testid="column"]:nth-of-type(2) h2, 
     [data-testid="column"]:nth-of-type(2) p, 
-    [data-testid="column"]:nth-of-type(2) a,
-    [data-testid="column"]:nth-of-type(2) span,
+    [data-testid="column"]:nth-of-type(2) a, 
+    [data-testid="column"]:nth-of-type(2) span, 
     [data-testid="column"]:nth-of-type(2) div {
         color: white !important;
     }
@@ -41,7 +41,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER FUNCTION: DYNAMIC TIME SLOTS ---
+# --- 3. HELPER: DYNAMIC TIME SLOTS ---
 def get_valid_time_slots(selected_date):
     day_idx = selected_date.weekday() 
     if day_idx in [0, 3, 4, 5, 6]: # Mon, Thu, Fri, Sat, Sun
@@ -88,12 +88,11 @@ try:
     ws_new = SHEET.worksheet("New_Users")
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # Check for or create the new Return Booking Sheet
+    # Return Booking Sheet
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
-        # Add Headers if creating new
         ws_return.append_row([
             "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
@@ -162,58 +161,65 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (SMART DATA FETCHING) ---
+    # --- TAB 2: RETURN PATIENT (SMART MATCHING FIX) ---
     with tab2:
         st.markdown("#### Verify Identity")
         
-        # Initialize Session State
         if 'verified' not in st.session_state:
             st.session_state['verified'] = False
-            # We store the entire user dictionary
-            st.session_state['user_data'] = {} 
+            st.session_state['user_data'] = {}
 
         if not st.session_state['verified']:
             phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
             
             if st.button("Find My Record"):
                 try:
-                    # 1. Get All Records (Rows) and Headers
-                    all_records = ws_exist.get_all_records() # This reads the headers automatically!
+                    # 1. READ ALL DATA AS A DICTIONARY (Handles headers automatically)
+                    all_records = ws_exist.get_all_records()
                     
-                    # 2. Find the user by Phone Number
                     found_user = None
-                    # Normalize input phone (remove spaces)
-                    clean_input_phone = str(phone_input).strip().replace(" ", "")
                     
-                    for record in all_records:
-                        # Try to find the 'Contact Number' column. 
-                        # We use loose matching in case header is 'Contact No' or 'Phone'
-                        # But since you said 'Contact Number', we look for that key.
-                        
-                        # Get phone from record (convert to string to be safe)
-                        record_phone = str(record.get("Contact Number", "")).strip().replace(" ", "")
-                        
-                        if clean_input_phone in record_phone and clean_input_phone != "":
-                            found_user = record
-                            break
+                    # 2. CLEAN THE INPUT (Remove spaces, dashes, +)
+                    # Example: "+971-50 123" becomes "97150123"
+                    clean_input = ''.join(filter(str.isdigit, str(phone_input)))
                     
-                    if found_user:
-                        st.session_state['verified'] = True
-                        st.session_state['user_data'] = found_user
-                        st.rerun()
+                    if not clean_input:
+                         st.warning("Please enter a valid number.")
                     else:
-                        st.error("Phone number not found in 'Existing_DB'. Please check the number or register as New.")
+                        # 3. LOOP AND MATCH WITH CLEANING
+                        for record in all_records:
+                            # We check keys carefully. 
+                            # Convert sheet value to string, then clean it
+                            sheet_phone_raw = str(record.get("Contact Number", ""))
+                            sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
+                            
+                            # CHECK: Does the sheet number CONTAIN the input, or vice versa?
+                            # This helps if one is "050123456" and the other is "97150123456"
+                            if clean_input in sheet_phone_clean or sheet_phone_clean in clean_input:
+                                if sheet_phone_clean != "": # Avoid matching empty cells
+                                    found_user = record
+                                    break
                         
+                        if found_user:
+                            st.session_state['verified'] = True
+                            st.session_state['user_data'] = found_user
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Number '{phone_input}' not found.")
+                            # DEBUG HELPER: Show user what headers the app sees
+                            with st.expander("Troubleshoot: See what data is being read"):
+                                st.write("The app is looking for a column named **'Contact Number'**.")
+                                st.write("First 3 records found in DB:", all_records[:3])
+
                 except Exception as e:
                     st.error(f"Error reading database: {e}")
         
         else:
-            # --- DISPLAY FETCHED DATA ---
+            # --- DISPLAY INFO ---
             user = st.session_state['user_data']
             
-            # Safe Get: Uses the exact headers you provided, defaults to "N/A" if missing
             p_name = user.get("Patient Name", "Valued Patient")
-            p_dob  = user.get("Data of Birth", "N/A") 
+            p_dob  = user.get("Data of Birth", "N/A")
             
             st.success(f"Welcome Back, **{p_name}**!")
             st.info(f"📅 **Date of Birth:** {p_dob}")
@@ -244,9 +250,8 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # Prepare Data to Copy
-                    # We fetch exactly the fields you requested from the session state
-                    save_data = [
+                    # COPY DATA
+                    ws_return.append_row([
                         user.get("Patient Name", ""),
                         user.get("Contact Number", ""),
                         user.get("Data of Birth", ""),
@@ -258,12 +263,8 @@ with col1:
                         r_treat,
                         "this patient needs to assign doctor",
                         "Confirmed (Returning)"
-                    ]
-                    
-                    # Save to the NEW sheet: Existing_Users_Booking
-                    ws_return.append_row(save_data)
+                    ])
                     st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
-                    
                 except Exception as e:
                     st.error(f"Error saving booking: {e}")
 
