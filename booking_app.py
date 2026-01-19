@@ -6,14 +6,13 @@ import datetime
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="Miami Dental Clinic", layout="wide")
 
-# --- 2. INITIALIZE SESSION STATE (FIXED) ---
-# This must run before anything else to prevent KeyErrors
+# --- 2. INITIALIZE SESSION STATE ---
 if 'verified' not in st.session_state:
     st.session_state['verified'] = False
 if 'user_data' not in st.session_state:
     st.session_state['user_data'] = {}
 
-# --- 3. CUSTOM CSS STYLING ---
+# --- 3. CUSTOM CSS ---
 st.markdown("""
 <style>
     .main { background-color: #f0f2f6; }
@@ -177,9 +176,7 @@ with col1:
             
             if st.button("Find My Record"):
                 try:
-                    # 1. READ ALL DATA (Smart Dictionary Read)
                     all_records = ws_exist.get_all_records()
-                    
                     found_user = None
                     clean_input = ''.join(filter(str.isdigit, str(phone_input)))
                     
@@ -187,12 +184,8 @@ with col1:
                          st.warning("Please enter a valid number.")
                     else:
                         for record in all_records:
-                            # SEARCH FOR 'Contact number'
-                            sheet_phone_raw = str(record.get("Contact number", ""))
-                            # Fallback casing check
-                            if not sheet_phone_raw:
-                                sheet_phone_raw = str(record.get("Contact Number", ""))
-                            
+                            # Contact Number Check
+                            sheet_phone_raw = str(record.get("Contact number", "") or record.get("Contact Number", ""))
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
                             if clean_input in sheet_phone_clean or sheet_phone_clean in clean_input:
@@ -214,9 +207,11 @@ with col1:
             # --- DISPLAY INFO ---
             user = st.session_state['user_data']
             
-            # Using specific keys you requested
-            p_name = user.get("PATIENT NAME", user.get("Patient Name", "Valued Patient"))
-            p_dob  = user.get("DATE OF BIRTH", "N/A")
+            # Smart Fetch for Name
+            p_name = user.get("PATIENT NAME") or user.get("Patient Name") or "Valued Patient"
+            
+            # Smart Fetch for DOB (Try all variations)
+            p_dob = user.get("DATE OF BIRTH") or user.get("Data of Birth") or user.get("Date of Birth") or "N/A"
             
             st.success(f"Welcome Back, **{p_name}**!")
             st.info(f"📅 **Date of Birth:** {p_dob}")
@@ -247,15 +242,20 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- MAPPING DATA FROM EXISTING_DB TO NEW BOOKING ---
+                    # --- SMART DATA MAPPING ---
+                    # We try multiple key names to find the data in your source sheet
+                    
                     save_data = [
-                        user.get("FILE", ""),              # FILE
-                        user.get("PATIENT NAME", ""),      # PATIENT NAME
-                        user.get("Contact number", ""),    # Contact number
-                        user.get("DATE OF BIRTH", ""),     # DATE OF BIRTH
-                        user.get("HEIGHT", ""),            # HEIGHT
-                        user.get("WEIGHT", ""),            # WEIGHT
-                        user.get("ALLERGY", ""),           # ALLERGY
+                        user.get("FILE", ""),                                      # FILE
+                        user.get("PATIENT NAME") or user.get("Patient Name", ""),  # NAME
+                        user.get("Contact number") or user.get("Contact Number", ""), # PHONE
+                        
+                        # SMART DOB FETCH
+                        user.get("DATE OF BIRTH") or user.get("Data of Birth") or user.get("Date of Birth", ""),
+                        
+                        user.get("HEIGHT") or user.get("Height", ""),
+                        user.get("WEIGHT") or user.get("Weight", ""),
+                        user.get("ALLERGY") or user.get("Allergy", ""),
                         
                         # NEW BOOKING DETAILS
                         str(r_date),
@@ -265,7 +265,6 @@ with col1:
                         "Confirmed (Returning)"
                     ]
                     
-                    # Save to Existing_Users_Booking
                     ws_return.append_row(save_data)
                     st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
                 except Exception as e:
