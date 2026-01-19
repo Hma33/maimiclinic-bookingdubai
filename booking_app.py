@@ -1,73 +1,91 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime, time
+import datetime
 
 # --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="Maimi Dental Clinic", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Miami Dental Clinic", layout="wide")
 
-# --- 2. CSS STYLING ---
+# --- 2. CUSTOM CSS STYLING ---
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
-    * { font-family: 'Source Sans Pro', sans-serif; }
-    .stApp { background-color: #0D223F !important; }
-    header, footer {visibility: hidden;}
-    .block-container { padding-top: 2rem; max_width: 1200px; }
+<style>
+    .main { background-color: #f0f2f6; }
     
-    /* Left Card (White) */
-    div[data-testid="column"]:nth-of-type(1) > div {
-        background-color: #FFFFFF !important;
-        padding: 40px !important;
-        border-radius: 8px !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        min-height: 800px;
-    }
-    div[data-testid="column"]:nth-of-type(1) * { color: #0D223F !important; }
-
-    /* Right Card (Dark) */
-    div[data-testid="column"]:nth-of-type(2) > div {
-        background-color: #1E2227 !important;
-        padding: 40px;
-        border-radius: 8px;
-        min-height: 800px;
-        color: white !important;
+    /* Right Column (Dark Info Panel) */
+    [data-testid="column"]:nth-of-type(2) {
+        background-color: #1E2A38;
+        border-radius: 15px;
+        padding: 30px;
+        color: white;
         text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    
+    /* Text Color Overrides for Dark Column */
+    [data-testid="column"]:nth-of-type(2) h2, 
+    [data-testid="column"]:nth-of-type(2) p, 
+    [data-testid="column"]:nth-of-type(2) a,
+    [data-testid="column"]:nth-of-type(2) span,
+    [data-testid="column"]:nth-of-type(2) div {
+        color: white !important;
     }
 
-    /* Inputs */
-    .stTextInput input, .stDateInput input, .stTimeInput input {
-        background-color: #F3F4F6 !important;
-        color: #1F2937 !important;
-        border: 1px solid #E5E7EB !important;
-        border-radius: 4px !important;
-        padding: 10px;
-    }
-    .stTabs [data-baseweb="tab-list"] { border-bottom: 2px solid #F3F4F6; margin-bottom: 20px; }
-    .stTabs [aria-selected="true"] {
-        color: #0D223F !important;
-        border-bottom: 3px solid #b91c1c !important;
-        font-weight: 600;
-    }
-    div[data-testid="stFormSubmitButton"] button {
-        background-color: #0D223F;
-        color: white !important;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 4px;
-        font-weight: 600;
+    /* Button Styling */
+    .stButton > button {
+        background-color: #1E2A38;
+        color: white;
         width: 100%;
-        margin-top: 10px;
+        border-radius: 5px;
+        height: 3em;
+        border: none;
+        font-weight: bold;
     }
-    .form-header { font-size: 15px; font-weight: 600; color: #0D223F; margin-top: 25px; margin-bottom: 8px; }
-    .input-label { font-size: 13px; color: #4B5563; margin-bottom: 4px; }
-    </style>
+    .stButton > button:hover {
+        background-color: #2c3e50;
+        color: white;
+    }
+</style>
 """, unsafe_allow_html=True)
 
-# --- 3. DATABASE CONNECTION ---
+# --- 3. HELPER FUNCTION: DYNAMIC TIME SLOTS ---
+def get_valid_time_slots(selected_date):
+    day_idx = selected_date.weekday() 
+    
+    # Mon-Sun Logic
+    if day_idx in [0, 3, 4, 5, 6]: 
+        start_h, end_h = 10, 24 
+    elif day_idx == 1: # Tue
+        start_h, end_h = 12, 22
+    elif day_idx == 2: # Wed
+        start_h, end_h = 14, 24
+    else:
+        start_h, end_h = 9, 17
+
+    slots = []
+    current_h = start_h
+    current_m = 0
+    
+    while current_h < end_h:
+        is_pm = current_h >= 12
+        display_h = current_h if current_h <= 12 else current_h - 12
+        if display_h == 0: display_h = 12 
+        period = "PM" if is_pm else "AM"
+        time_label = f"{display_h:02d}:{current_m:02d} {period}"
+        slots.append(time_label)
+        current_m += 30
+        if current_m == 60:
+            current_m = 0
+            current_h += 1
+            
+    return slots
+
+# --- 4. GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    if "gcp_service_account" not in st.secrets:
+        st.error("Missing 'gcp_service_account' in secrets.")
+        st.stop()
     creds_dict = dict(st.secrets["gcp_service_account"])
     if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
@@ -80,257 +98,189 @@ try:
     ws_new = SHEET.worksheet("New_Users")
     ws_exist = SHEET.worksheet("Existing_DB")
     ws_final = SHEET.worksheet("Final_Bookings")
-    
-    # Connect to (or create) Existing_Users_Booking
-    try:
-        ws_exist_booking = SHEET.worksheet("Existing_Users_Booking")
-    except:
-        ws_exist_booking = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
-        
 except Exception as e:
-    st.error(f"Connection Error: {e}")
+    st.error(f"🚨 Database Connection Failed: {e}")
     st.stop()
 
-# --- 4. LOGIC: TIME VALIDATION ---
-def check_clinic_hours(selected_date, selected_time):
-    day_name = selected_date.strftime("%A") 
+# --- 5. APP LAYOUT ---
+col1, col2 = st.columns([2, 1], gap="large")
+
+# === LEFT COLUMN: FORMS ===
+with col1:
+    st.title("Dental Clinic Appointment and Treatment Form")
     
-    if day_name == "Tuesday":
-        open_time = time(12, 0)
-        close_time = time(22, 0)
-        schedule_msg = "12:00 PM - 10:00 PM"
-    elif day_name == "Wednesday":
-        open_time = time(14, 0)
-        close_time = time(23, 59)
-        schedule_msg = "02:00 PM - 12:00 AM"
-    else: # Mon, Thu, Fri, Sat, Sun
-        open_time = time(10, 0)
-        close_time = time(23, 59)
-        schedule_msg = "10:00 AM - 12:00 AM"
-
-    if open_time <= selected_time <= close_time:
-        return True, ""
-    else:
-        return False, f"⚠️ Clinic is closed at this time on {day_name}s. Open hours: {schedule_msg}"
-
-# --- HELPER: GET DATA BY HEADER ---
-def get_data_by_headers(sheet, row_index, required_headers):
-    """
-    Fetches data from specific columns based on header names.
-    Returns a dictionary: { "HeaderName": "Value", ... }
-    """
-    # 1. Get all headers from the first row
-    all_headers = sheet.row_values(1)
+    tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
-    # 2. Get all values from the specific row
-    row_values = sheet.row_values(row_index)
-    
-    # 3. Map headers to indices
-    data_map = {}
-    for req_h in required_headers:
-        if req_h in all_headers:
-            col_idx = all_headers.index(req_h)
-            # Ensure index is within bounds of the row data
-            if col_idx < len(row_values):
-                data_map[req_h] = row_values[col_idx]
-            else:
-                data_map[req_h] = "" # Cell is empty
-        else:
-            data_map[req_h] = "N/A" # Header not found in sheet
-            
-    return data_map
-
-# --- 5. UI LAYOUT ---
-col_form, col_info = st.columns([1.6, 1], gap="large")
-
-# === RIGHT COLUMN (Info Card) ===
-with col_info:
-    st.markdown("""
-        <div style="text-align: center; margin-top: 50px;">
-            <div style="
-                width: 120px; height: 120px; 
-                background-color: black; 
-                border-radius: 50%; 
-                margin: 0 auto 25px auto; 
-                display: flex; align-items: center; justify-content: center;
-                border: 2px solid #374151;">
-                <span style="font-size: 50px;">🦷</span>
-            </div>
-            <h2 style="color: white; margin-bottom: 30px; font-weight: 600;">Maimi Dental Clinic</h2>
-            <hr style="border-color: #4B5563; width: 80%; margin: 0 auto 30px auto; opacity: 0.5;">
-            
-            <div style="color: #D1D5DB; font-size: 14px; line-height: 1.6; margin-top: 20px;">
-                <strong>Opening Hours:</strong><br>
-                Mon, Thu-Sun: 10 AM - 12 AM<br>
-                Tue: 12 PM - 10 PM<br>
-                Wed: 02 PM - 12 AM
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-# === LEFT COLUMN (Form) ===
-with col_form:
-    st.markdown("### Dental Clinic Appointment and Treatment Form")
-    tab1, tab2 = st.tabs(["New Registration", "Return"])
-    
-    treatments = [
-        "Consult with professionals", "Scaling & Polishing", "Fillings",
-        "Root Canal Treatment (RCT)", "Teeth Whitening", 
-        "Routine and Wisdom Teeth Extractions", "Panoramic and Periapical X-ray",
-        "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
-    ]
-
-    # --- TAB 1: NEW REGISTRATION ---
+    # --- TAB 1: NEW PATIENT ---
     with tab1:
-        with st.form("new_reg_form"):
-            st.markdown('<div class="form-header">1. Full Name</div>', unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown('<div class="input-label">First Name</div>', unsafe_allow_html=True)
-                fname = st.text_input("fname", label_visibility="collapsed")
-            with c2:
-                st.markdown('<div class="input-label">Last Name</div>', unsafe_allow_html=True)
-                lname = st.text_input("lname", label_visibility="collapsed")
-            
-            st.markdown('<div class="form-header">2. Phone Number (WhatsApp)</div>', unsafe_allow_html=True)
-            st.markdown('<div class="input-label">Phone Number</div>', unsafe_allow_html=True)
-            phone = st.text_input("phone", label_visibility="collapsed")
-            
-            st.markdown('<div class="form-header">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
-            c3, c4 = st.columns(2)
-            with c3:
-                st.markdown('<div class="input-label">Preferred Date</div>', unsafe_allow_html=True)
-                date = st.date_input("date", label_visibility="collapsed")
-            with c4:
-                st.markdown('<div class="input-label">Preferred Time</div>', unsafe_allow_html=True)
-                time_val = st.time_input("time", label_visibility="collapsed")
-            
-            st.markdown('<div class="form-header">4. Select the Treatments</div>', unsafe_allow_html=True)
-            selected = []
-            for t in treatments:
-                if st.checkbox(t):
-                    selected.append(t)
-            
-            submit = st.form_submit_button("Book now")
-            
-            if submit:
-                if not (fname and phone):
-                    st.error("Please fill in your name and phone number.")
-                else:
-                    is_open, error_msg = check_clinic_hours(date, time_val)
-                    if not is_open:
-                        st.error(error_msg)
-                    else:
-                        fullname = f"{fname} {lname}"
-                        t_str = ", ".join(selected)
-                        ws_new.append_row([fullname, phone, str(date), str(time_val), t_str, str(datetime.now())])
-                        ws_final.append_row([fullname, phone, str(date), str(time_val), t_str, "New", "Confirmed"])
-                        st.success("Registration Successful!")
-
-    # --- TAB 2: RETURN USER (STRICT HEADER MATCHING) ---
-    with tab2:
-        st.write("")
-        st.markdown("**1. Verify your identity to book faster.**")
+        st.markdown("#### 1. Full Name")
+        c1, c2 = st.columns(2)
+        with c1:
+            first_name = st.text_input("First Name", placeholder="e.g. John")
+        with c2:
+            last_name = st.text_input("Last Name", placeholder="e.g. Doe")
         
+        st.markdown("#### 2. Phone Number (WhatsApp)")
+        phone = st.text_input("Phone Number", placeholder="+971 ...")
+        
+        st.markdown("#### 3. Preferred Appointment")
+        d_col, t_col = st.columns(2)
+        with d_col:
+            date = st.date_input("Preferred Date", min_value=datetime.date.today())
+        with t_col:
+            valid_slots = get_valid_time_slots(date)
+            time_str = st.selectbox("Available Time Slots", valid_slots)
+
+        st.markdown("#### 4. Select Treatments")
+        treatments_list_new = [
+            "Consult with professionals", "Scaling & Polishing", "Fillings",
+            "Root Canal Treatment (RCT)", "Teeth Whitening", 
+            "Routine and Wisdom Teeth Extractions", "Panoramic and Periapical X-ray",
+            "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
+        ]
+        
+        tc1, tc2 = st.columns(2)
+        selected_treatments = []
+        for i, treat in enumerate(treatments_list_new):
+            target_col = tc1 if i % 2 == 0 else tc2
+            if target_col.checkbox(treat):
+                selected_treatments.append(treat)
+        
+        st.write("")
+        if st.button("Book now", type="primary"):
+            if first_name and last_name and phone:
+                full_name = f"{first_name} {last_name}"
+                treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
+                timestamp = str(datetime.datetime.now())
+                
+                try:
+                    ws_new.append_row([full_name, phone, str(date), time_str, treatments_str, timestamp])
+                    ws_final.append_row([
+                        full_name, phone, str(date), time_str, treatments_str, 
+                        "this patient needs to assign doctor", "Confirmed"
+                    ])
+                    st.success(f"✅ Thank you {first_name}! Appointment booked for {date} at {time_str}.")
+                except Exception as e:
+                    st.error(f"Error saving data: {e}")
+            else:
+                st.warning("⚠️ Please fill in your Name and Phone Number.")
+
+    # --- TAB 2: RETURN PATIENT ---
+    with tab2:
+        st.markdown("#### Verify Identity")
+        
+        # --- SAFE INITIALIZATION ---
         if 'verified' not in st.session_state:
-            st.session_state.verified = False
-            st.session_state.patient_dict = {}
+            st.session_state['verified'] = False
+        if 'user_name' not in st.session_state:
+            st.session_state['user_name'] = ""
+        if 'user_phone' not in st.session_state:
+            st.session_state['user_phone'] = ""
+        if 'last_visit' not in st.session_state:
+            st.session_state['last_visit'] = "Unknown"
 
-        # List of Exact Headers we need from Existing_DB
-        REQUIRED_FIELDS = ["FILE", "#PATIENT NAME", "Contact number", "DATE OF BIRTH", "HEIGHT", "WEIGHT", "ALLERGY"]
-
-        if not st.session_state.verified:
-            st.markdown('<div class="input-label">Enter your registered Phone Number</div>', unsafe_allow_html=True)
-            v_phone = st.text_input("v_phone", label_visibility="collapsed")
+        if not st.session_state['verified']:
+            phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
             
-            c_btn1, c_btn2 = st.columns([1, 3])
-            with c_btn1:
-                if st.button("Verify me"):
-                    try:
-                        # 1. Find the cell with the phone number
-                        cell = ws_exist.find(v_phone)
+            if st.button("Find My Record"):
+                try:
+                    cell = ws_exist.find(phone_input)
+                    if cell:
+                        user_data = ws_exist.row_values(cell.row)
                         
-                        # 2. Extract data safely using headers
-                        data_map = get_data_by_headers(ws_exist, cell.row, REQUIRED_FIELDS)
+                        st.session_state['verified'] = True
+                        st.session_state['user_phone'] = phone_input
                         
-                        st.session_state.verified = True
-                        st.session_state.patient_dict = data_map
-                        st.rerun()
-                    except gspread.exceptions.CellNotFound:
-                        st.error("Phone number not found in database.")
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                        # --- FIXING THE MAPPING HERE ---
+                        # Based on your image:
+                        # Index 0 was showing Date -> So we put that in last_visit
+                        # Index 2 was showing Name -> So we put that in user_name
+                        
+                        # 1. NAME (Index 2)
+                        if len(user_data) > 2:
+                            st.session_state['user_name'] = user_data[2]
+                        else:
+                            st.session_state['user_name'] = "Patient"
+
+                        # 2. DATE (Index 0)
+                        if len(user_data) > 0:
+                            st.session_state['last_visit'] = user_data[0]
+                        else:
+                            st.session_state['last_visit'] = "No prior date"
+
+                        st.rerun() 
+                    else:
+                        st.error("Number not found in existing records.")
+                except Exception as e:
+                    st.error(f"Error finding record: {e}")
         
         else:
-            p_data = st.session_state.patient_dict
-            st.success(f"Welcome back, {p_data.get('#PATIENT NAME', 'Patient')}!")
+            # --- DISPLAY INFO ---
+            st.success(f"Welcome Back!!! Last Time You Went: {st.session_state['last_visit']}")
+            st.markdown(f"### Booking for: **{st.session_state['user_name']}**")
             
-            # Debug view (optional, you can remove this)
-            # st.write(p_data) 
-            
-            with st.form("return_booking"):
-                st.markdown('<div class="form-header">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
-                rc1, rc2 = st.columns(2)
-                with rc1:
-                    st.markdown('<div class="input-label">Preferred Date</div>', unsafe_allow_html=True)
-                    r_date = st.date_input("r_date", label_visibility="collapsed")
-                with rc2:
-                    st.markdown('<div class="input-label">Preferred Time</div>', unsafe_allow_html=True)
-                    r_time = st.time_input("r_time", label_visibility="collapsed")
-                
-                # Dynamic Helper
-                r_day = r_date.strftime("%A")
-                if r_day == "Tuesday":
-                    st.caption(f"ℹ️ Hours for {r_day}: 12:00 PM - 10:00 PM")
-                elif r_day == "Wednesday":
-                    st.caption(f"ℹ️ Hours for {r_day}: 02:00 PM - 12:00 AM")
-                else:
-                    st.caption(f"ℹ️ Hours for {r_day}: 10:00 AM - 12:00 AM")
-
-                st.markdown('<div class="form-header">4. Select the Treatments</div>', unsafe_allow_html=True)
-                r_sel = []
-                for t in treatments:
-                    if st.checkbox(t, key=f"r_{t}"):
-                        r_sel.append(t)
-                
-                r_sub = st.form_submit_button("Book now")
-                
-                if r_sub:
-                    is_open_r, error_msg_r = check_clinic_hours(r_date, r_time)
-                    
-                    if not is_open_r:
-                        st.error(error_msg_r)
-                    else:
-                        t_str = ", ".join(r_sel)
-                        
-                        # --- COPY DATA TO 'Existing_Users_Booking' ---
-                        
-                        # 1. Setup Headers for Destination if empty
-                        booking_headers = REQUIRED_FIELDS + ["BOOKING DATE", "BOOKING TIME", "TREATMENTS"]
-                        
-                        if not ws_exist_booking.get_all_values():
-                            ws_exist_booking.append_row(booking_headers)
-                        
-                        # 2. Prepare Data Row in exact order
-                        row_to_append = [
-                            p_data.get("FILE", ""),
-                            p_data.get("#PATIENT NAME", ""),
-                            p_data.get("Contact number", ""),
-                            p_data.get("DATE OF BIRTH", ""),
-                            p_data.get("HEIGHT", ""),
-                            p_data.get("WEIGHT", ""),
-                            p_data.get("ALLERGY", ""),
-                            str(r_date),
-                            str(r_time),
-                            t_str
-                        ]
-                        
-                        ws_exist_booking.append_row(row_to_append)
-                        ws_final.append_row([p_data.get("#PATIENT NAME"), p_data.get("Contact number"), str(r_date), str(r_time), t_str, "Return", "Confirmed"])
-                        
-                        st.success("Booking Confirmed!")
-                        
-            if st.button("Reset Verification"):
-                st.session_state.verified = False
-                st.session_state.patient_dict = {}
+            if st.button("Change User"):
+                # Clear session state to prevent sticking to old values
+                st.session_state['verified'] = False
+                st.session_state['user_name'] = ""
+                st.session_state['last_visit'] = ""
                 st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### New Appointment Details")
+            
+            rd_col, rt_col = st.columns(2)
+            with rd_col:
+                r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
+            with rt_col:
+                r_valid_slots = get_valid_time_slots(r_date)
+                r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
+            
+            full_treatments_list = [
+                "Consult with professionals", "Scaling & Polishing", "Fillings",
+                "Root Canal Treatment (RCT)", "Teeth Whitening", 
+                "Routine and Wisdom Teeth Extractions", "Panoramic and Periapical X-ray",
+                "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
+            ]
+            r_treat = st.selectbox("Treatment Required", full_treatments_list)
+            
+            st.write("")
+            if st.button("Confirm Booking"):
+                try:
+                    ws_final.append_row([
+                        st.session_state['user_name'],
+                        st.session_state['user_phone'],
+                        str(r_date),
+                        r_time_str,
+                        r_treat,
+                        "this patient needs to assign doctor",
+                        "Confirmed (Returning)"
+                    ])
+                    st.success(f"✅ Booking Confirmed for {r_date} at {r_time_str}!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+# === RIGHT COLUMN: INFO PANEL ===
+with col2:
+    st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
+    st.markdown("## Miami Dental Clinic")
+    st.markdown("---")
+    st.markdown("""
+    **Muraqqabat road, REQA bldg. 1st floor,**
+    **office no. 104. Dubai, UAE.**
+    
+    The same building of Rigga Restaurant.
+    Al Rigga Metro is the nearest metro station (Exit 2).
+    """)
+    st.write("")
+    st.markdown("""
+    ### 🕒 Operating Hours
+    
+    **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
+    **Tuesday:** 12:00 PM – 10:00 PM
+    **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
+    """)
+    st.markdown("---")
+    st.markdown("📍 **[View on Google Map](https://maps.google.com)**")
+    st.write("")
+    st.info("ℹ️ **System Status:** Online | Data is saving to Google Sheets.")
