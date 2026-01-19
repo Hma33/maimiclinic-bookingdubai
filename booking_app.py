@@ -6,7 +6,14 @@ import datetime
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="Miami Dental Clinic", layout="wide")
 
-# --- 2. CUSTOM CSS STYLING ---
+# --- 2. INITIALIZE SESSION STATE (FIXED) ---
+# This must run before anything else to prevent KeyErrors
+if 'verified' not in st.session_state:
+    st.session_state['verified'] = False
+if 'user_data' not in st.session_state:
+    st.session_state['user_data'] = {}
+
+# --- 3. CUSTOM CSS STYLING ---
 st.markdown("""
 <style>
     .main { background-color: #f0f2f6; }
@@ -41,7 +48,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER: DYNAMIC TIME SLOTS ---
+# --- 4. HELPER: DYNAMIC TIME SLOTS ---
 def get_valid_time_slots(selected_date):
     day_idx = selected_date.weekday() 
     if day_idx in [0, 3, 4, 5, 6]: # Mon, Thu, Fri, Sat, Sun
@@ -69,7 +76,7 @@ def get_valid_time_slots(selected_date):
             current_h += 1
     return slots
 
-# --- 4. GOOGLE SHEETS CONNECTION ---
+# --- 5. GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -88,12 +95,11 @@ try:
     ws_new = SHEET.worksheet("New_Users")
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # Connect to (or create) Existing_Users_Booking
+    # Return Booking Sheet
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
-        # Add Headers if new
         ws_return.append_row([
             "FILE", "PATIENT NAME", "Contact number", "DATE OF BIRTH", "HEIGHT", "WEIGHT", "ALLERGY",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
@@ -103,7 +109,7 @@ except Exception as e:
     st.error(f"🚨 Database Connection Failed: {e}")
     st.stop()
 
-# --- 5. APP LAYOUT ---
+# --- 6. APP LAYOUT ---
 col1, col2 = st.columns([2, 1], gap="large")
 
 # === LEFT COLUMN: FORMS ===
@@ -162,14 +168,10 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT (DATA MIGRATION INTEGRATED) ---
+    # --- TAB 2: RETURN PATIENT ---
     with tab2:
         st.markdown("#### Verify Identity")
         
-        if 'verified' not in st.session_state:
-            st.session_state['verified'] = False
-            st.session_state['user_data'] = {}
-
         if not st.session_state['verified']:
             phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
             
@@ -245,9 +247,7 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- CRITICAL: MAPPING DATA FROM EXISTING_DB TO NEW BOOKING ---
-                    # We pull the exact fields you asked for from the session state (found_user)
-                    
+                    # --- MAPPING DATA FROM EXISTING_DB TO NEW BOOKING ---
                     save_data = [
                         user.get("FILE", ""),              # FILE
                         user.get("PATIENT NAME", ""),      # PATIENT NAME
