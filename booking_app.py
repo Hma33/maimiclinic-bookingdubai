@@ -48,42 +48,50 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER FUNCTION: TIME SLOTS ---
+# --- 3. HELPER FUNCTION: DYNAMIC TIME SLOTS ---
 def get_valid_time_slots(selected_date):
     """
     Generates 30-minute time slots based on the clinic's specific schedule.
     """
-    day_idx = selected_date.weekday() # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    day_idx = selected_date.weekday() 
     
-    # Define Start (start_h) and End (end_h) hours based on the day
-    if day_idx in [0, 3, 4, 5, 6]: # Mon, Thu, Fri, Sat, Sun
-        # 10:00 AM to 12:00 AM (Midnight)
-        start_h, end_h = 10, 24 
-    elif day_idx == 1: # Tuesday
-        # 12:00 PM to 10:00 PM
-        start_h, end_h = 12, 22
-    elif day_idx == 2: # Wednesday
-        # 02:00 PM to 12:00 AM (Midnight)
-        start_h, end_h = 14, 24
+    # --- LOGIC FOR HOURS ---
+    # Case A: Mon, Thu, Fri, Sat, Sun -> 10:00 AM to 12:00 AM (Midnight)
+    if day_idx in [0, 3, 4, 5, 6]: 
+        start_h = 10
+        end_h = 24  # 24 represents Midnight
+        
+    # Case B: Tuesday -> 12:00 PM to 10:00 PM
+    elif day_idx == 1: 
+        start_h = 12
+        end_h = 22  # 22 is 10 PM
+        
+    # Case C: Wednesday -> 02:00 PM to 12:00 AM (Midnight)
+    elif day_idx == 2: 
+        start_h = 14  # 14 is 2 PM
+        end_h = 24
+        
     else:
-        # Fallback (Just in case)
-        start_h, end_h = 9, 17 
+        # Fallback
+        start_h, end_h = 9, 17
 
-    # Generate the Slots
+    # --- GENERATE SLOTS ---
     slots = []
     current_h = start_h
     current_m = 0
     
+    # Loop generates slots up to the closing time (e.g., last slot 23:30 for midnight close)
     while current_h < end_h:
         is_pm = current_h >= 12
         
-        # Convert 24h to 12h format for display
+        # Format Hour (12-hour clock)
         display_h = current_h if current_h <= 12 else current_h - 12
         if display_h == 0: display_h = 12 
         
         period = "PM" if is_pm else "AM"
         
-        # Formatting
+        # Formatting string
         time_label = f"{display_h:02d}:{current_m:02d} {period}"
         slots.append(time_label)
         
@@ -100,21 +108,18 @@ def get_valid_time_slots(selected_date):
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
-    # Check if secrets exist
     if "gcp_service_account" not in st.secrets:
         st.error("Missing 'gcp_service_account' in .streamlit/secrets.toml")
         st.stop()
         
     creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # Handle private key formatting issue
+    # Handle private key formatting
     if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
 
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
-    
-    # Open the spreadsheet
     return client.open("Clinic_Booking_System")
 
 # Initialize Sheets
@@ -127,21 +132,19 @@ except Exception as e:
     st.error(f"🚨 Database Connection Failed: {e}")
     st.stop()
 
-# --- 5. APP LAYOUT & LOGIC ---
-# Create two columns: Left (Form) is wider, Right (Info) is narrower
+# --- 5. APP LAYOUT ---
 col1, col2 = st.columns([2, 1], gap="large")
 
 # === LEFT COLUMN: THE FORMS ===
 with col1:
     st.title("Dental Clinic Appointment and Treatment Form")
     
-    # Create the Tabs logic
     tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
     # --- TAB 1: NEW PATIENT ---
     with tab1:
         with st.form("new_patient_form"):
-            # Section 1: Name
+            # 1. Name
             st.markdown("#### 1. Full Name")
             c1, c2 = st.columns(2)
             with c1:
@@ -149,21 +152,21 @@ with col1:
             with c2:
                 last_name = st.text_input("Last Name", placeholder="e.g. Doe")
             
-            # Section 2: Contact
+            # 2. Phone
             st.markdown("#### 2. Phone Number (WhatsApp)")
             phone = st.text_input("Phone Number", placeholder="+971 ...")
             
-            # Section 3: Date & Time (Dynamic)
+            # 3. Date & Time (Dynamic)
             st.markdown("#### 3. Preferred Appointment")
             d_col, t_col = st.columns(2)
             with d_col:
                 date = st.date_input("Preferred Date", min_value=datetime.date.today())
             with t_col:
-                # Use our custom function to get valid slots for the selected date
+                # !!! THIS CALLS THE FUNCTION TO GET THE CORRECT SLOTS FOR THE DATE !!!
                 valid_slots = get_valid_time_slots(date)
                 time_str = st.selectbox("Available Time Slots", valid_slots)
 
-            # Section 4: Treatments
+            # 4. Treatments
             st.markdown("#### 4. Select Treatments")
             treatments_list = [
                 "Consultation", "Scaling & Polishing", "Fillings",
@@ -171,7 +174,6 @@ with col1:
                 "X-ray", "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
             ]
             
-            # Use columns to make the checkbox list compact
             tc1, tc2 = st.columns(2)
             selected_treatments = []
             for i, treat in enumerate(treatments_list):
@@ -179,7 +181,7 @@ with col1:
                 if target_col.checkbox(treat):
                     selected_treatments.append(treat)
             
-            st.write("") # Spacer
+            st.write("")
             submitted = st.form_submit_button("Book now")
             
             if submitted:
@@ -204,13 +206,12 @@ with col1:
     with tab2:
         st.markdown("#### Verify Identity")
         
-        # Initialize session state variables if they don't exist
         if 'verified' not in st.session_state:
             st.session_state['verified'] = False
             st.session_state['user_name'] = ""
             st.session_state['user_phone'] = ""
 
-        # Step 1: Verification
+        # Step 1: Verify
         if not st.session_state['verified']:
             phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
             if st.button("Find My Record"):
@@ -219,15 +220,15 @@ with col1:
                     if cell:
                         user_data = ws_exist.row_values(cell.row)
                         st.session_state['verified'] = True
-                        st.session_state['user_name'] = user_data[0] # Assumes Name is in Col A
+                        st.session_state['user_name'] = user_data[0] 
                         st.session_state['user_phone'] = phone_input
-                        st.rerun() # Refresh to show the booking form
+                        st.rerun() 
                     else:
                         st.error("Number not found in existing records.")
                 except Exception as e:
                     st.error("Number not found or API Error.")
         
-        # Step 2: Booking (Only shows if verified)
+        # Step 2: Book
         else:
             st.success(f"👋 Welcome back, **{st.session_state['user_name']}**")
             
@@ -241,7 +242,7 @@ with col1:
                 with rd_col:
                     r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
                 with rt_col:
-                    # Apply the same time slot logic here
+                    # !!! DYNAMIC TIME SLOTS FOR RETURN USERS TOO !!!
                     r_valid_slots = get_valid_time_slots(r_date)
                     r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
                 
@@ -264,7 +265,7 @@ with col1:
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-# === RIGHT COLUMN: INFO PANEL (Static) ===
+# === RIGHT COLUMN: INFO PANEL ===
 with col2:
     st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
     
@@ -281,7 +282,7 @@ with col2:
     """)
     
     st.write("")
-    st.markdown("📍 **[Google Map](https://www.google.com/maps)**")
+    st.markdown("📍 **[Google Map](https://maps.google.com)**")
     
     st.write("")
     st.write("")
