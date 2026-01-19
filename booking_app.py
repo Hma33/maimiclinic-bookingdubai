@@ -1,291 +1,230 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+import datetime
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="Maimi Dental Clinic", layout="wide", initial_sidebar_state="collapsed")
+# --- 1. PAGE CONFIG ---
+st.set_page_config(page_title="Miami Dental Clinic", layout="wide")
 
-# --- 2. ADVANCED CSS (The "Front End Engine" Look) ---
+# --- 2. CUSTOM CSS (UI STYLING) ---
 st.markdown("""
-    <style>
-    /* IMPORT FONT */
-    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600&display=swap');
-
-    /* GLOBAL RESET */
-    * { font-family: 'Source Sans Pro', sans-serif; }
+<style>
+    .main { background-color: #f0f2f6; }
     
-    /* 1. GLOBAL BACKGROUND -> NAVY BLUE (Matches Figma) */
-    .stApp {
-        background-color: #0D223F !important;
-    }
-
-    /* HIDE DEFAULT HEADER/FOOTER */
-    header, footer {visibility: hidden;}
-    .block-container { padding-top: 2rem; max_width: 1200px; }
-
-    /* --- LEFT COLUMN: THE WHITE FORM CARD --- */
-    /* This makes the form stand out on the dark background */
-    div[data-testid="column"]:nth-of-type(1) > div {
-        background-color: #FFFFFF !important;
-        padding: 40px !important;
-        border-radius: 8px !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        min-height: 800px;
-    }
-
-    /* FORCE TEXT COLOR INSIDE WHITE CARD */
-    /* This ensures labels are Black/Navy, not invisible white */
-    div[data-testid="column"]:nth-of-type(1) h1,
-    div[data-testid="column"]:nth-of-type(1) h2,
-    div[data-testid="column"]:nth-of-type(1) h3,
-    div[data-testid="column"]:nth-of-type(1) p,
-    div[data-testid="column"]:nth-of-type(1) label,
-    div[data-testid="column"]:nth-of-type(1) span,
-    div[data-testid="column"]:nth-of-type(1) div {
-        color: #0D223F !important;
-    }
-
-    /* --- RIGHT COLUMN: THE DARK INFO CARD --- */
-    div[data-testid="column"]:nth-of-type(2) > div {
-        background-color: #1E2227 !important; /* Dark Grey/Navy */
-        padding: 40px;
-        border-radius: 8px;
-        min-height: 800px; /* Match height of left card */
-        color: white !important;
+    /* Right Column (Info Panel) Styling */
+    [data-testid="column"]:nth-of-type(2) {
+        background-color: #1E2A38;
+        border-radius: 15px;
+        padding: 30px;
+        color: white;
         text-align: center;
-    }
-
-    /* --- INPUT FIELDS STYLING --- */
-    .stTextInput input, .stDateInput input, .stTimeInput input {
-        background-color: #F3F4F6 !important; /* Light Grey Input */
-        color: #1F2937 !important; /* Dark Text */
-        border: 1px solid #E5E7EB !important;
-        border-radius: 4px !important;
-        padding: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
     
-    /* --- TABS STYLING --- */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 20px;
-        border-bottom: 2px solid #F3F4F6;
-        margin-bottom: 20px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        background-color: transparent;
-        color: #9CA3AF; /* Inactive Grey */
-        font-weight: 400;
-        border: none;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #0D223F !important; /* Active Navy */
-        border-bottom: 3px solid #b91c1c !important; /* Red Underline */
-        font-weight: 600;
+    /* Text Color Overrides for Dark Column */
+    [data-testid="column"]:nth-of-type(2) h2, 
+    [data-testid="column"]:nth-of-type(2) p, 
+    [data-testid="column"]:nth-of-type(2) a,
+    [data-testid="column"]:nth-of-type(2) span {
+        color: white !important;
     }
 
-    /* --- BUTTON STYLING --- */
-    div[data-testid="stFormSubmitButton"] button {
-        background-color: #0D223F;
-        color: white !important;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 4px;
-        font-weight: 600;
+    /* Button Styling */
+    .stButton > button {
+        background-color: #1E2A38;
+        color: white;
         width: 100%;
-        margin-top: 10px;
-        transition: background 0.2s;
+        border-radius: 5px;
+        height: 3em;
+        border: none;
     }
-    div[data-testid="stFormSubmitButton"] button:hover {
-        background-color: #1a3a6c;
-        color: white !important;
+    .stButton > button:hover {
+        background-color: #2c3e50;
+        color: white;
     }
-
-    /* --- CUSTOM TEXT CLASSES --- */
-    .form-header {
-        font-size: 15px;
-        font-weight: 600;
-        color: #0D223F;
-        margin-top: 25px;
-        margin-bottom: 8px;
-    }
-    .input-label {
-        font-size: 13px;
-        color: #4B5563;
-        margin-bottom: 4px;
-    }
-    </style>
+</style>
 """, unsafe_allow_html=True)
 
-# --- 3. DATABASE CONNECTION ---
+# --- 3. GOOGLE SHEETS CONNECTION ---
 @st.cache_resource
 def get_sheet_connection():
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    # Load credentials from secrets
+    if "gcp_service_account" not in st.secrets:
+        st.error("Missing 'gcp_service_account' in streamlit secrets.")
+        st.stop()
+        
     creds_dict = dict(st.secrets["gcp_service_account"])
-    # Fix for private key newline issue
+    
+    # Fix newline characters in private key
     if "\\n" in creds_dict["private_key"]:
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
+    
+    # Open the spreadsheet
     return client.open("Clinic_Booking_System")
 
+# Initialize Sheets
 try:
     SHEET = get_sheet_connection()
     ws_new = SHEET.worksheet("New_Users")
     ws_exist = SHEET.worksheet("Existing_DB")
     ws_final = SHEET.worksheet("Final_Bookings")
 except Exception as e:
-    st.error(f"Connection Error: {e}")
+    st.error(f"🚨 Database Connection Failed: {e}")
     st.stop()
 
-# --- 4. UI LAYOUT ---
-col_form, col_info = st.columns([1.6, 1], gap="large")
+# --- 4. APP LAYOUT ---
+col1, col2 = st.columns([2, 1], gap="large")
 
-# === RIGHT COLUMN (Dark Info Card) ===
-with col_info:
-    # Use HTML to ensure styling is protected from Streamlit defaults
-    st.markdown("""
-        <div style="margin-top: 50px;">
-            <div style="
-                width: 120px; height: 120px; 
-                background-color: black; 
-                border-radius: 50%; 
-                margin: 0 auto 25px auto; 
-                display: flex; align-items: center; justify-content: center;
-                border: 2px solid #374151;">
-                <span style="font-size: 50px;">🦷</span>
-            </div>
-            
-            <h2 style="color: white; margin-bottom: 30px; font-weight: 600;">Maimi Dental Clinic</h2>
-            
-            <hr style="border-color: #4B5563; width: 80%; margin: 0 auto 30px auto; opacity: 0.5;">
-            
-            <div style="color: #D1D5DB; font-size: 14px; line-height: 1.6;">
-                <p>Muraqqabat road, REQA bldg. 1st floor,<br>
-                office no. 104. Dubai, UAE.</p>
-                <br>
-                <p>The same building of Rigga Restaurant.<br>
-                Al Rigga Metro is the nearest metro station<br>exit 2</p>
-            </div>
-            
-            <div style="margin-top: 40px;">
-                <a href="https://maps.google.com" target="_blank" style="color: white; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
-                    <span>📍</span> Google Map
-                </a>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-# === LEFT COLUMN (White Form Card) ===
-with col_form:
-    st.markdown("### Dental Clinic Appointment and Treatment Form")
+# === LEFT COLUMN: FORMS ===
+with col1:
+    st.title("Dental Clinic Appointment and Treatment Form")
     
-    # Custom Tabs
-    tab1, tab2 = st.tabs(["New Registration", "Return"])
+    tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
-    # --- TAB 1: NEW REGISTRATION ---
+    # --- FLOW 1: NEW REGISTRATION ---
     with tab1:
-        with st.form("new_reg_form"):
-            # 1. Full Name
-            st.markdown('<div class="form-header">1. Full Name</div>', unsafe_allow_html=True)
+        with st.form("new_patient_form"):
+            st.markdown("#### 1. Full Name")
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown('<div class="input-label">First Name</div>', unsafe_allow_html=True)
-                fname = st.text_input("fname", label_visibility="collapsed")
+                first_name = st.text_input("First Name", placeholder="e.g. John")
             with c2:
-                st.markdown('<div class="input-label">Last Name</div>', unsafe_allow_html=True)
-                lname = st.text_input("lname", label_visibility="collapsed")
+                last_name = st.text_input("Last Name", placeholder="e.g. Doe")
             
-            # 2. Phone
-            st.markdown('<div class="form-header">2. Phone Number (WhatsApp)</div>', unsafe_allow_html=True)
-            st.markdown('<div class="input-label">Phone Number</div>', unsafe_allow_html=True)
-            phone = st.text_input("phone", label_visibility="collapsed")
+            st.markdown("#### 2. Phone Number (WhatsApp)")
+            phone = st.text_input("Phone Number", placeholder="+971 ...")
             
-            # 3. Date & Time
-            st.markdown('<div class="form-header">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
-            c3, c4 = st.columns(2)
-            with c3:
-                st.markdown('<div class="input-label">Preferred Date</div>', unsafe_allow_html=True)
-                date = st.date_input("date", label_visibility="collapsed")
-            with c4:
-                st.markdown('<div class="input-label">Preferred Time</div>', unsafe_allow_html=True)
-                time = st.time_input("time", label_visibility="collapsed")
+            st.markdown("#### 3. Preferred Appointment")
+            d_col, t_col = st.columns(2)
+            with d_col:
+                date = st.date_input("Preferred Date", min_value=datetime.date.today())
+            with t_col:
+                time = st.time_input("Preferred Time", value=datetime.time(9, 00))
             
-            # 4. Treatments
-            st.markdown('<div class="form-header">4. Select the Treatments</div>', unsafe_allow_html=True)
-            treatments = [
-                "Consult with professionals", "Scaling & Polishing", "Fillings",
-                "Root Canal Treatment (RCT)", "Teeth Whitening", 
-                "Routine and Wisdom Teeth Extractions", "Panoramic and Periapical X-ray",
-                "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
+            st.markdown("#### 4. Select Treatments")
+            treatments_list = [
+                "Consultation", "Scaling & Polishing", "Fillings",
+                "Root Canal (RCT)", "Teeth Whitening", "Extractions", 
+                "X-ray", "Crown & Bridge", "Veneers", "Kids Treatment"
             ]
             
-            selected = []
-            for t in treatments:
-                if st.checkbox(t):
-                    selected.append(t)
+            # Create columns for checkboxes to save space
+            tc1, tc2 = st.columns(2)
+            selected_treatments = []
+            
+            for i, treat in enumerate(treatments_list):
+                # Distribute checkboxes across two columns
+                target_col = tc1 if i % 2 == 0 else tc2
+                if target_col.checkbox(treat):
+                    selected_treatments.append(treat)
             
             st.write("")
-            submit = st.form_submit_button("Book now")
+            submitted = st.form_submit_button("Book now")
             
-            if submit:
-                if fname and phone:
-                    fullname = f"{fname} {lname}"
-                    t_str = ", ".join(selected)
-                    ws_new.append_row([fullname, phone, str(date), str(time), t_str, str(datetime.now())])
-                    ws_final.append_row([fullname, phone, str(date), str(time), t_str, "New", "Confirmed"])
-                    st.success("Registration Successful!")
-                else:
-                    st.error("Please fill in the required fields.")
-
-    # --- TAB 2: RETURN USER ---
-    with tab2:
-        st.write("")
-        st.markdown("**1. Verify your identity to book faster.**")
-        
-        # Initialize session state
-        if 'verified' not in st.session_state:
-            st.session_state.verified = False
-            st.session_state.v_name = ""
-
-        if not st.session_state.verified:
-            st.markdown('<div class="input-label">Enter your registered Phone Number</div>', unsafe_allow_html=True)
-            v_phone = st.text_input("v_phone", label_visibility="collapsed")
-            
-            c_btn1, c_btn2 = st.columns([1, 3])
-            with c_btn1:
-                if st.button("Verify me"):
+            if submitted:
+                if first_name and last_name and phone:
+                    full_name = f"{first_name} {last_name}"
+                    treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
+                    
                     try:
-                        cell = ws_exist.find(v_phone)
-                        row = ws_exist.row_values(cell.row)
-                        st.session_state.verified = True
-                        st.session_state.v_name = row[0]
-                        st.rerun()
-                    except:
-                        st.error("Number not found.")
+                        # 1. Save to New Users Sheet
+                        ws_new.append_row([full_name, phone, str(date), str(time), treatments_str, str(datetime.datetime.now())])
+                        
+                        # 2. Save to Final Bookings
+                        ws_final.append_row([full_name, phone, str(date), str(time), treatments_str, "Dr. Assigned", "Confirmed"])
+                        
+                        st.success(f"✅ Thank you {first_name}! Appointment booked for {date}.")
+                    except Exception as e:
+                        st.error(f"Error saving data: {e}")
+                else:
+                    st.warning("⚠️ Please fill in Name and Phone Number.")
+
+    # --- FLOW 2: RETURN PATIENT ---
+    with tab2:
+        st.markdown("#### Verify Identity")
         
+        # Initialize session state for verification
+        if 'verified' not in st.session_state:
+            st.session_state['verified'] = False
+            st.session_state['user_name'] = ""
+            st.session_state['user_phone'] = ""
+
+        # Verification Section
+        if not st.session_state['verified']:
+            phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
+            if st.button("Find My Record"):
+                try:
+                    cell = ws_exist.find(phone_input)
+                    if cell:
+                        user_data = ws_exist.row_values(cell.row)
+                        st.session_state['verified'] = True
+                        # Assuming Name is in Column 1 (Index 0)
+                        st.session_state['user_name'] = user_data[0] 
+                        st.session_state['user_phone'] = phone_input
+                        st.rerun()
+                    else:
+                        st.error("Number not found.")
+                except Exception as e:
+                    st.error("Number not found or API Error.")
+        
+        # Booking Section (Shown only after verification)
         else:
-            st.success(f"Welcome back, {st.session_state.v_name}!")
-            
-            with st.form("return_booking"):
-                st.markdown('<div class="form-header">3. Preferred Appointment Date and Time</div>', unsafe_allow_html=True)
-                rc1, rc2 = st.columns(2)
-                with rc1:
-                    st.markdown('<div class="input-label">Preferred Date</div>', unsafe_allow_html=True)
-                    r_date = st.date_input("r_date", label_visibility="collapsed")
-                with rc2:
-                    st.markdown('<div class="input-label">Preferred Time</div>', unsafe_allow_html=True)
-                    r_time = st.time_input("r_time", label_visibility="collapsed")
+            st.success(f"👋 Welcome back, **{st.session_state['user_name']}**")
+            if st.button("Change User"):
+                st.session_state['verified'] = False
+                st.rerun()
+
+            with st.form("return_booking_form"):
+                st.markdown("#### New Appointment Details")
+                rd_col, rt_col = st.columns(2)
+                with rd_col:
+                    r_date = st.date_input("Date", min_value=datetime.date.today())
+                with rt_col:
+                    r_time = st.time_input("Time", value=datetime.time(9, 00))
                 
-                st.markdown('<div class="form-header">4. Select the Treatments</div>', unsafe_allow_html=True)
-                r_sel = []
-                for t in treatments:
-                    if st.checkbox(t, key=f"r_{t}"):
-                        r_sel.append(t)
+                r_treat = st.selectbox("Treatment Required", ["Routine Checkup", "Cleaning", "Follow-up", "Pain/Emergency"])
                 
-                r_sub = st.form_submit_button("Book now")
+                r_submitted = st.form_submit_button("Confirm Booking")
                 
-                if r_sub:
-                    t_str = ", ".join(r_sel)
-                    ws_final.append_row([st.session_state.v_name, "Existing", str(r_date), str(r_time), t_str, "Return", "Confirmed"])
-                    st.success("Booking Confirmed!")
+                if r_submitted:
+                    try:
+                        ws_final.append_row([
+                            st.session_state['user_name'],
+                            st.session_state['user_phone'],
+                            str(r_date),
+                            str(r_time),
+                            r_treat,
+                            "Dr. Auto-Assigned",
+                            "Confirmed (Returning)"
+                        ])
+                        st.success("✅ Booking Confirmed!")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+# === RIGHT COLUMN: INFO PANEL ===
+with col2:
+    st.markdown("<div style='font-size: 80px; text-align:center;'>🦷</div>", unsafe_allow_html=True) 
+    st.markdown("## Miami Dental Clinic")
+    st.markdown("---")
+    
+    st.markdown("""
+    **Muraqqabat road, REQA bldg. 1st floor,** **office no. 104. Dubai, UAE.**
+    
+    The same building of Rigga Restaurant.
+    Al Rigga Metro is the nearest metro station
+    exit 2
+    """)
+    
+    st.write("")
+    st.markdown("📍 **[Google Map](http://maps.google.com)**")
+    
+    st.write("")
+    st.write("")
+    st.info("ℹ️ **Admin Note:** Data is saved to 'New_Users' & 'Final_Bookings' tabs.")
