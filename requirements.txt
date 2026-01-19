@@ -1,3 +1,4 @@
 streamlit
 gspread==6.1.2
 google-auth
+pip install streamlit gspread google-auth
