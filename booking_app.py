@@ -117,25 +117,30 @@ with col1:
     
     tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
-    # --- TAB 1: NEW PATIENT ---
+    # --- TAB 1: NEW PATIENT (FIXED KEYS) ---
     with tab1:
         st.markdown("#### 1. Full Name")
         c1, c2 = st.columns(2)
         with c1:
-            first_name = st.text_input("First Name", placeholder="e.g. John")
+            # ADDED key="new_fname"
+            first_name = st.text_input("First Name", placeholder="e.g. John", key="new_fname")
         with c2:
-            last_name = st.text_input("Last Name", placeholder="e.g. Doe")
+            # ADDED key="new_lname"
+            last_name = st.text_input("Last Name", placeholder="e.g. Doe", key="new_lname")
         
         st.markdown("#### 2. Phone Number (WhatsApp)")
-        phone = st.text_input("Phone Number", placeholder="+971 ...")
+        # ADDED key="new_phone"
+        phone = st.text_input("Phone Number", placeholder="+971 ...", key="new_phone")
         
         st.markdown("#### 3. Preferred Appointment")
         d_col, t_col = st.columns(2)
         with d_col:
-            date = st.date_input("Preferred Date", min_value=datetime.date.today())
+            # ADDED key="new_date"
+            date = st.date_input("Preferred Date", min_value=datetime.date.today(), key="new_date")
         with t_col:
             valid_slots = get_valid_time_slots(date)
-            time_str = st.selectbox("Available Time Slots", valid_slots)
+            # ADDED key="new_time"
+            time_str = st.selectbox("Available Time Slots", valid_slots, key="new_time")
 
         st.markdown("#### 4. Select Treatments")
         treatments_list_new = [
@@ -149,11 +154,13 @@ with col1:
         selected_treatments = []
         for i, treat in enumerate(treatments_list_new):
             target_col = tc1 if i % 2 == 0 else tc2
-            if target_col.checkbox(treat):
+            # Checkbox keys must be unique too
+            if target_col.checkbox(treat, key=f"new_treat_{i}"):
                 selected_treatments.append(treat)
         
         st.write("")
-        if st.button("Book now", type="primary"):
+        if st.button("Book now", type="primary", key="new_submit"):
+            # CHECK USING SESSION STATE VARIABLES OR DIRECT VARIABLES
             if first_name and last_name and phone:
                 full_name = f"{first_name} {last_name}"
                 treatments_str = ", ".join(selected_treatments) if selected_treatments else "General Checkup"
@@ -212,9 +219,7 @@ with col1:
             
             p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
             
-            # HIDDEN FROM UI, BUT AVAILABLE FOR SAVING
-            # We don't show p_file or p_dob here anymore.
-            
+            # HIDDEN FROM UI
             st.success(f"Welcome Back, **{p_name}**!")
             
             if st.button("Change User"):
