@@ -169,7 +169,7 @@ with col1:
     with tab2:
         st.markdown("#### Verify Identity")
         
-        # --- SAFE INITIALIZATION (Fixed Syntax Here) ---
+        # --- SAFE INITIALIZATION ---
         if 'verified' not in st.session_state:
             st.session_state['verified'] = False
         if 'user_name' not in st.session_state:
@@ -191,21 +191,22 @@ with col1:
                         st.session_state['verified'] = True
                         st.session_state['user_phone'] = phone_input
                         
-                        # --- CORRECTED COLUMN MAPPING ---
-                        # Index 0 (Column A) = NAME
-                        # Index 2 (Column C) = DATE
+                        # --- FIXING THE MAPPING HERE ---
+                        # Based on your image:
+                        # Index 0 was showing Date -> So we put that in last_visit
+                        # Index 2 was showing Name -> So we put that in user_name
                         
-                        # 1. Get Name from Index 0
-                        if len(user_data) > 0:
-                            st.session_state['user_name'] = user_data[0]
-                        else:
-                            st.session_state['user_name'] = "Valued Patient"
-
-                        # 2. Get Last Visit Date from Index 2
+                        # 1. NAME (Index 2)
                         if len(user_data) > 2:
-                            st.session_state['last_visit'] = user_data[2]
+                            st.session_state['user_name'] = user_data[2]
                         else:
-                            st.session_state['last_visit'] = "No prior date found"
+                            st.session_state['user_name'] = "Patient"
+
+                        # 2. DATE (Index 0)
+                        if len(user_data) > 0:
+                            st.session_state['last_visit'] = user_data[0]
+                        else:
+                            st.session_state['last_visit'] = "No prior date"
 
                         st.rerun() 
                     else:
@@ -219,7 +220,10 @@ with col1:
             st.markdown(f"### Booking for: **{st.session_state['user_name']}**")
             
             if st.button("Change User"):
+                # Clear session state to prevent sticking to old values
                 st.session_state['verified'] = False
+                st.session_state['user_name'] = ""
+                st.session_state['last_visit'] = ""
                 st.rerun()
 
             st.markdown("---")
