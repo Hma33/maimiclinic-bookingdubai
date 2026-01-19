@@ -79,7 +79,7 @@ def get_valid_time_slots(selected_date):
             
     return slots
 
-# --- 4. GOOGLE SHEETS CONNECTION ---
+# --- 4. GOOGLE SHEETS CONNECTION & HEADERS ---
 @st.cache_resource
 def get_sheet_connection():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -98,6 +98,22 @@ try:
     ws_new = SHEET.worksheet("New_Users")
     ws_exist = SHEET.worksheet("Existing_DB")
     ws_final = SHEET.worksheet("Final_Bookings")
+
+    # --- NEW: AUTO-ADD HEADERS IF SHEET IS EMPTY ---
+    # This checks if the first row is empty. If yes, it adds the titles.
+    
+    # 1. Headers for New_Users
+    if not ws_new.row_values(1):
+        ws_new.append_row(["Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Timestamp"])
+
+    # 2. Headers for Final_Bookings
+    if not ws_final.row_values(1):
+        ws_final.append_row(["Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"])
+
+    # 3. Headers for Existing_DB (Optional, mostly for your reference)
+    if not ws_exist.row_values(1):
+        ws_exist.append_row(["Patient Name", "Phone Number", "Last Visit Date"])
+
 except Exception as e:
     st.error(f"🚨 Database Connection Failed: {e}")
     st.stop()
@@ -191,20 +207,19 @@ with col1:
                         st.session_state['verified'] = True
                         st.session_state['user_phone'] = phone_input
                         
-                        # --- FIXING THE MAPPING HERE ---
-                        # Based on your image:
-                        # Index 0 was showing Date -> So we put that in last_visit
-                        # Index 2 was showing Name -> So we put that in user_name
+                        # --- CORRECTED COLUMN MAPPING ---
+                        # Index 0 (Column A) = NAME
+                        # Index 2 (Column C) = DATE
                         
-                        # 1. NAME (Index 2)
-                        if len(user_data) > 2:
-                            st.session_state['user_name'] = user_data[2]
+                        # 1. Get Name from Index 0 (First Column)
+                        if len(user_data) > 0:
+                            st.session_state['user_name'] = user_data[0]
                         else:
                             st.session_state['user_name'] = "Patient"
 
-                        # 2. DATE (Index 0)
-                        if len(user_data) > 0:
-                            st.session_state['last_visit'] = user_data[0]
+                        # 2. Get Date from Index 2 (Third Column)
+                        if len(user_data) > 2:
+                            st.session_state['last_visit'] = user_data[2]
                         else:
                             st.session_state['last_visit'] = "No prior date"
 
@@ -220,7 +235,7 @@ with col1:
             st.markdown(f"### Booking for: **{st.session_state['user_name']}**")
             
             if st.button("Change User"):
-                # Clear session state to prevent sticking to old values
+                # Clear session state
                 st.session_state['verified'] = False
                 st.session_state['user_name'] = ""
                 st.session_state['last_visit'] = ""
