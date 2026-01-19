@@ -44,6 +44,11 @@ st.markdown("""
         background-color: #2c3e50;
         color: white;
     }
+    
+    /* Metrics Styling */
+    [data-testid="stMetricValue"] {
+        font-size: 1.2rem !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -169,61 +174,76 @@ with col1:
     with tab2:
         st.markdown("#### Verify Identity")
         
-        # --- SAFE INITIALIZATION ---
+        # --- SESSION STATE INITIALIZATION ---
         if 'verified' not in st.session_state:
             st.session_state['verified'] = False
-        if 'user_name' not in st.session_state:
-            st.session_state['user_name'] = ""
-        if 'user_phone' not in st.session_state:
-            st.session_state['user_phone'] = ""
-        if 'last_visit' not in st.session_state:
-            st.session_state['last_visit'] = "Unknown"
+        if 'patient_details' not in st.session_state:
+            st.session_state['patient_details'] = {}
 
         if not st.session_state['verified']:
             phone_input = st.text_input("Enter your registered Phone Number", key="verify_phone")
             
             if st.button("Find My Record"):
                 try:
+                    # 1. Search for the phone number
                     cell = ws_exist.find(phone_input)
+                    
                     if cell:
+                        # 2. Get Headers (Row 1) and Data (Found Row)
+                        headers = ws_exist.row_values(1)
                         user_data = ws_exist.row_values(cell.row)
                         
+                        # 3. Define columns to find exactly as requested
+                        target_columns = [
+                            "FILE", "#PATIENT NAME", "Contact number", 
+                            "DATE OF BIRTH", "HEIGHT", "WEIGHT", "ALLERGY"
+                        ]
+                        
+                        found_info = {}
+                        
+                        # 4. Map Headers to Indices
+                        for col_name in target_columns:
+                            try:
+                                # Find index of the column name in headers
+                                idx = headers.index(col_name)
+                                # Extract data if the row is long enough
+                                if idx < len(user_data):
+                                    found_info[col_name] = user_data[idx]
+                                else:
+                                    found_info[col_name] = "N/A"
+                            except ValueError:
+                                # Column header not found in sheet
+                                found_info[col_name] = "-"
+
+                        # 5. Save to Session State
                         st.session_state['verified'] = True
-                        st.session_state['user_phone'] = phone_input
-                        
-                        # --- FIXING THE MAPPING HERE ---
-                        # Based on your image:
-                        # Index 0 was showing Date -> So we put that in last_visit
-                        # Index 2 was showing Name -> So we put that in user_name
-                        
-                        # 1. NAME (Index 2)
-                        if len(user_data) > 2:
-                            st.session_state['user_name'] = user_data[2]
-                        else:
-                            st.session_state['user_name'] = "Patient"
-
-                        # 2. DATE (Index 0)
-                        if len(user_data) > 0:
-                            st.session_state['last_visit'] = user_data[0]
-                        else:
-                            st.session_state['last_visit'] = "No prior date"
-
+                        st.session_state['patient_details'] = found_info
                         st.rerun() 
                     else:
-                        st.error("Number not found in existing records.")
+                        st.error("Number not found in Existing_DB.")
                 except Exception as e:
                     st.error(f"Error finding record: {e}")
         
         else:
             # --- DISPLAY INFO ---
-            st.success(f"Welcome Back!!! Last Time You Went: {st.session_state['last_visit']}")
-            st.markdown(f"### Booking for: **{st.session_state['user_name']}**")
+            details = st.session_state['patient_details']
+            name = details.get("#PATIENT NAME", "Patient")
+            
+            st.success(f"Welcome Back, **{name}**!")
+            
+            # Display Medical Info
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("File ID", details.get("FILE", "-"))
+            m2.metric("Height", details.get("HEIGHT", "-"))
+            m3.metric("Weight", details.get("WEIGHT", "-"))
+            m4.metric("DOB", details.get("DATE OF BIRTH", "-"))
+            
+            if details.get("ALLERGY") and details.get("ALLERGY") != "-":
+                st.warning(f"⚠️ **Allergies:** {details.get('ALLERGY')}")
             
             if st.button("Change User"):
-                # Clear session state to prevent sticking to old values
                 st.session_state['verified'] = False
-                st.session_state['user_name'] = ""
-                st.session_state['last_visit'] = ""
+                st.session_state['patient_details'] = {}
                 st.rerun()
 
             st.markdown("---")
@@ -247,9 +267,13 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
+                    # Use retrieved name and phone for the booking
+                    booking_name = st.session_state['patient_details'].get("#PATIENT NAME", "Unknown")
+                    booking_phone = st.session_state['patient_details'].get("Contact number", "Unknown")
+                    
                     ws_final.append_row([
-                        st.session_state['user_name'],
-                        st.session_state['user_phone'],
+                        booking_name,
+                        booking_phone,
                         str(r_date),
                         r_time_str,
                         r_treat,
