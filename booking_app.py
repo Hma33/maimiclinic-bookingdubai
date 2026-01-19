@@ -100,7 +100,7 @@ try:
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
         ws_return.append_row([
-            "FILE", "PATIENT NAME", "Contact number", "DATE OF BIRTH", "HEIGHT", "WEIGHT", "ALLERGY",
+            "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
         ])
 
@@ -167,7 +167,7 @@ with col1:
             else:
                 st.warning("⚠️ Please fill in your Name and Phone Number.")
 
-    # --- TAB 2: RETURN PATIENT ---
+    # --- TAB 2: RETURN PATIENT (FIXED COLUMN MAPPING) ---
     with tab2:
         st.markdown("#### Verify Identity")
         
@@ -184,7 +184,7 @@ with col1:
                          st.warning("Please enter a valid number.")
                     else:
                         for record in all_records:
-                            # Contact Number Check
+                            # Search for 'Contact number'
                             sheet_phone_raw = str(record.get("Contact number", "") or record.get("Contact Number", ""))
                             sheet_phone_clean = ''.join(filter(str.isdigit, sheet_phone_raw))
                             
@@ -207,11 +207,10 @@ with col1:
             # --- DISPLAY INFO ---
             user = st.session_state['user_data']
             
-            # Smart Fetch for Name
-            p_name = user.get("PATIENT NAME") or user.get("Patient Name") or "Valued Patient"
-            
-            # Smart Fetch for DOB (Try all variations)
-            p_dob = user.get("DATE OF BIRTH") or user.get("Data of Birth") or user.get("Date of Birth") or "N/A"
+            # Smart Fetch using exact header names
+            p_name = user.get("PATIENT NAME") or user.get("Patient Name", "Valued Patient")
+            # Fetch DOB specifically from "DATE OF BIRTH"
+            p_dob = user.get("DATE OF BIRTH") or user.get("Data of Birth") or "N/A"
             
             st.success(f"Welcome Back, **{p_name}**!")
             st.info(f"📅 **Date of Birth:** {p_dob}")
@@ -242,22 +241,25 @@ with col1:
             st.write("")
             if st.button("Confirm Booking"):
                 try:
-                    # --- SMART DATA MAPPING ---
-                    # We try multiple key names to find the data in your source sheet
+                    # --- FIXED MAPPING (REMOVED 'FILE') ---
+                    # This ensures Col 1 = Name, Col 2 = Phone, Col 3 = DOB
                     
                     save_data = [
-                        user.get("FILE", ""),                                      # FILE
-                        user.get("PATIENT NAME") or user.get("Patient Name", ""),  # NAME
-                        user.get("Contact number") or user.get("Contact Number", ""), # PHONE
+                        # 1. Patient Name
+                        user.get("PATIENT NAME") or user.get("Patient Name", ""),
                         
-                        # SMART DOB FETCH
-                        user.get("DATE OF BIRTH") or user.get("Data of Birth") or user.get("Date of Birth", ""),
+                        # 2. Contact Number
+                        user.get("Contact number") or user.get("Contact Number", ""),
                         
+                        # 3. Data of Birth (Looking for 'DATE OF BIRTH')
+                        user.get("DATE OF BIRTH") or user.get("Data of Birth", ""),
+                        
+                        # 4. Stats
                         user.get("HEIGHT") or user.get("Height", ""),
                         user.get("WEIGHT") or user.get("Weight", ""),
                         user.get("ALLERGY") or user.get("Allergy", ""),
                         
-                        # NEW BOOKING DETAILS
+                        # 5. New Booking
                         str(r_date),
                         r_time_str,
                         r_treat,
