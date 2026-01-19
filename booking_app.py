@@ -101,15 +101,15 @@ try:
             "Full Name", "Phone Number", "Appointment Date", "Time", "Treatments", "Doctor Assignment", "Status"
         ])
 
-    # 2. Existing DB (Read Only)
+    # 2. Existing DB (Read Only - Search Source)
     ws_exist = SHEET.worksheet("Existing_DB")
     
-    # 3. Return Patient Booking Sheet
+    # 3. Return Patient Booking Sheet (Destination)
     try:
         ws_return = SHEET.worksheet("Existing_Users_Booking")
     except:
         ws_return = SHEET.add_worksheet(title="Existing_Users_Booking", rows="1000", cols="20")
-        # ADDED "RE" to the headers here
+        # Initialize headers if created for the first time
         ws_return.append_row([
             "FILE #", "Patient Name", "Contact Number", "Data of Birth", "Height", "Weight", "Allergy", "RE",
             "Appointment Date", "Time", "Treatment", "Doctor Status", "Booking Status"
@@ -171,6 +171,7 @@ with col1:
                 
                 try:
                     # Save to SINGLE sheet: New_Users_Booking
+                    # .append_row adds to the bottom, never deletes
                     ws_new_booking.append_row([
                         full_name, 
                         phone, 
@@ -203,7 +204,7 @@ with col1:
                          st.warning("Please enter a valid number.")
                     else:
                         for record in all_records:
-                            # Clean keys
+                            # Clean keys (remove spaces)
                             clean_record = {k.strip(): v for k, v in record.items()}
                             
                             # Search Phone
@@ -261,6 +262,9 @@ with col1:
             if st.button("Confirm Booking"):
                 try:
                     # --- FINAL MAPPING (INCLUDES 'RE' DATA) ---
+                    # Smart Fetch for RE (checks RE, Re, re)
+                    re_data = user.get("RE") or user.get("Re") or user.get("re", "")
+                    
                     save_data = [
                         # 0. FILE #
                         user.get("FILE #") or user.get("FILE", ""), 
@@ -279,8 +283,8 @@ with col1:
                         user.get("WEIGHT") or user.get("Weight", ""),
                         user.get("ALLERGY") or user.get("Allergy", ""),
                         
-                        # 5. RE Data (ADDED HERE)
-                        user.get("RE", ""),
+                        # 5. RE Data
+                        re_data,
                         
                         # 6. New Booking
                         str(r_date),
@@ -290,6 +294,7 @@ with col1:
                         "Confirmed (Returning)"
                     ]
                     
+                    # This strictly ADDS a new row
                     ws_return.append_row(save_data)
                     st.success("✅ Thank you for your appointment. We will shortly send the booking confirmation.")
                 except Exception as e:
