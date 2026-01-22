@@ -124,7 +124,7 @@ col1, col2 = st.columns([2, 1], gap="large")
 
 # === LEFT COLUMN: FORMS ===
 with col1:
-    st.title("Dental Clinic Appointment and Treatment Form")
+    st.title("Miami Dental Clinic Appointment and Treatment Form")
     
     tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
@@ -315,7 +315,7 @@ with col2:
     """)
     st.write("")
     st.markdown("""
-    ### 🕒 Operating Hours
+    ### Operating Hours
     
     **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
     **Tuesday:** 12:00 PM – 10:00 PM
@@ -324,5 +324,5 @@ with col2:
     st.markdown("---")
     st.markdown("📍 **[View on Google Map](https://www.google.com/maps/place/Miami+General+Dental+Clinic/@25.2636757,55.325599,17z/data=!3m1!4b1!4m6!3m5!1s0x3e5f5d1e0d3058ad:0x3a8d8b12b7f74d3b!8m2!3d25.2636757!4d55.325599!16s%2Fg%2F11wjbrtggl?entry=ttu&g_ep=EgoyMDI2MDExMy4wIKXMDSoASAFQAw%3D%3D)**")
     st.write("")
-    st.info("ℹ️ **System Status:** Online | Data is saving to Google Sheets.")
+
 
