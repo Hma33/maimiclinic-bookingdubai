@@ -15,46 +15,26 @@ if 'user_data' not in st.session_state:
 # --- 3. CUSTOM CSS ---
 st.markdown("""
 <style>
-    /* Main background */
-    .stApp {
-        background-color: #f0f2f6;
-    }
-    
-    /* LEFT COLUMN: Input Fields Styling */
-    .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #e6e6e6 !important;
-        border: none !important;
-        border-radius: 0px !important;
-        color: black !important;
-    }
-    
-    /* RIGHT COLUMN: Dark Card Styling */
-    [data-testid="column"]:nth-of-type(2) > div {
-        background-color: #19202a; /* Dark Navy */
+    .main { background-color: #f0f2f6; }
+    [data-testid="column"]:nth-of-type(2) {
+        background-color: #1E2A38;
         border-radius: 15px;
-        padding: 40px 20px;
+        padding: 30px;
         color: white;
         text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    
-    /* Text colors in right column */
     [data-testid="column"]:nth-of-type(2) h2, 
     [data-testid="column"]:nth-of-type(2) p, 
+    [data-testid="column"]:nth-of-type(2) a, 
     [data-testid="column"]:nth-of-type(2) span, 
     [data-testid="column"]:nth-of-type(2) div {
         color: white !important;
     }
-
-    /* Button Styling */
     .stButton > button {
-        background-color: #19202a;
+        background-color: #1E2A38;
         color: white;
-        width: 150px;
+        width: 100%;
         border-radius: 5px;
         height: 3em;
         border: none;
@@ -64,11 +44,6 @@ st.markdown("""
         background-color: #2c3e50;
         color: white;
     }
-    
-    /* Hide Streamlit footer/header if desired */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    
 </style>
 """, unsafe_allow_html=True)
 
@@ -149,36 +124,31 @@ col1, col2 = st.columns([2, 1], gap="large")
 
 # === LEFT COLUMN: FORMS ===
 with col1:
-    st.markdown("### Dental Clinic Appointment and Treatment Form")
-    st.write("")
+    st.title("Miami Dental Clinic Appointment and Treatment Form")
     
-    tab1, tab2 = st.tabs(["New Registration", "Return"])
+    tab1, tab2 = st.tabs(["New Registration", "Return Patient"])
     
     # --- TAB 1: NEW PATIENT ---
     with tab1:
-        st.write("")
-        st.markdown("**1. Full Name**")
+        st.markdown("#### 1. Full Name")
         c1, c2 = st.columns(2)
         with c1:
-            first_name = st.text_input("First Name", placeholder="", label_visibility="visible", key="n_fname")
+            first_name = st.text_input("First Name", placeholder="e.g. John", key="n_fname")
         with c2:
-            last_name = st.text_input("Last Name", placeholder="", label_visibility="visible", key="n_lname")
+            last_name = st.text_input("Last Name", placeholder="e.g. Doe", key="n_lname")
         
-        st.write("")
-        st.markdown("**2. Phone Number(WhatsApp)**")
-        phone = st.text_input("Phone Number", placeholder="", label_visibility="visible", key="n_phone")
+        st.markdown("#### 2. Phone Number (WhatsApp)")
+        phone = st.text_input("Phone Number", placeholder="+971 ...", key="n_phone")
         
-        st.write("")
-        st.markdown("**3. Preferred Appointment Date and Time**")
-        st.markdown("Preferred Date")
-        date = st.date_input("Preferred Date", min_value=datetime.date.today(), label_visibility="collapsed", key="n_date")
-        
-        st.markdown("Preferred Time")
-        valid_slots = get_valid_time_slots(date)
-        time_str = st.selectbox("Preferred Time", valid_slots, label_visibility="collapsed", key="n_time")
+        st.markdown("#### 3. Preferred Appointment")
+        d_col, t_col = st.columns(2)
+        with d_col:
+            date = st.date_input("Preferred Date", min_value=datetime.date.today(), key="n_date")
+        with t_col:
+            valid_slots = get_valid_time_slots(date)
+            time_str = st.selectbox("Available Time Slots", valid_slots, key="n_time")
 
-        st.write("")
-        st.markdown("**4. Select the Treatments**")
+        st.markdown("#### 4. Select Treatments")
         treatments_list_new = [
             "Consult with professionals", "Scaling & Polishing", "Fillings",
             "Root Canal Treatment (RCT)", "Teeth Whitening", 
@@ -186,10 +156,11 @@ with col1:
             "Crown & Bridge", "Veneers", "Kids Treatment", "Partial & Full Denture"
         ]
         
-        # Single column for treatments
+        tc1, tc2 = st.columns(2)
         selected_treatments = []
         for i, treat in enumerate(treatments_list_new):
-            if st.checkbox(treat, key=f"n_treat_{i}"):
+            target_col = tc1 if i % 2 == 0 else tc2
+            if target_col.checkbox(treat, key=f"n_treat_{i}"):
                 selected_treatments.append(treat)
         
         st.write("")
@@ -271,12 +242,12 @@ with col1:
             st.markdown("---")
             st.markdown("#### New Appointment Details")
             
-            # Returning patient form also needs single column treatment? 
-            # The image only shows "Select the Treatments" generally. I'll stick to consistent design.
-            
-            r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
-            r_valid_slots = get_valid_time_slots(r_date)
-            r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
+            rd_col, rt_col = st.columns(2)
+            with rd_col:
+                r_date = st.date_input("Date", min_value=datetime.date.today(), key="ret_date")
+            with rt_col:
+                r_valid_slots = get_valid_time_slots(r_date)
+                r_time_str = st.selectbox("Time", r_valid_slots, key="ret_time")
             
             full_treatments_list = [
                 "Consult with professionals", "Scaling & Polishing", "Fillings",
@@ -329,39 +300,29 @@ with col1:
 
 # === RIGHT COLUMN: INFO PANEL ===
 with col2:
-    # Use HTML/CSS to align content in the center vertically/horizontally as per the card style
-    st.write("") # Spacer
-    
-    # Logo
-    st.image("miami_logo.png", width=150)
-    
-    st.markdown("<h3>Maimi Dental Clinic</h3>", unsafe_allow_html=True)
-    
-    st.write("")
-    st.write("")
-    st.write("")
-    
+    h_col1, h_col2 = st.columns([1, 3])
+    with h_col1:
+        st.image("miami_logo.png", use_container_width=True)
+    with h_col2:
+        st.markdown("## Miami Dental Clinic")
     st.markdown("---")
-    
     st.markdown("""
-    <div style="font-size: 0.9em; line-height: 1.6;">
-        <b>Muraqqabat road, REQA bldg. 1st floor,<br>
-        office no. 104. Dubai, UAE.</b><br><br>
-        The same building of Rigga Restaurant.<br>
-        Al Rigga Metro is the nearest metro station<br>
-        exit 2
-    </div>
-    """, unsafe_allow_html=True)
+    **Muraqqabat road, REQA bldg. 1st floor,**
+    **office no. 104. Dubai, UAE.**
     
+    The same building of Rigga Restaurant.
+    Al Rigga Metro is the nearest metro station (Exit 2).
+    """)
     st.write("")
-    st.write("")
-    
-    # Map Link with Icon
     st.markdown("""
-        <a href="https://www.google.com/maps/place/Miami+General+Dental+Clinic/@25.2636757,55.325599,17z" target="_blank" style="text-decoration: none; color: white;">
-            📍 Google Map
-        </a>
-    """, unsafe_allow_html=True)
-
+    ### Operating Hours
+    
+    **Mon, Thu, Fri, Sat, Sun:** 10:00 AM – 12:00 AM (Midnight)
+    **Tuesday:** 12:00 PM – 10:00 PM
+    **Wednesday:** 02:00 PM – 12:00 AM (Midnight)
+    """)
+    st.markdown("---")
+    st.markdown("📍 **[View on Google Map](https://www.google.com/maps/place/Miami+General+Dental+Clinic/@25.2636757,55.325599,17z/data=!3m1!4b1!4m6!3m5!1s0x3e5f5d1e0d3058ad:0x3a8d8b12b7f74d3b!8m2!3d25.2636757!4d55.325599!16s%2Fg%2F11wjbrtggl?entry=ttu&g_ep=EgoyMDI2MDExMy4wIKXMDSoASAFQAw%3D%3D)**")
+    st.write("")
 
 
